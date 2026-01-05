@@ -24,11 +24,7 @@ const CONFIG = {
 
     // รหัสผ่านเข้าสู่ระบบ (Admin)
     passwords: {
-        '1001': 'จัดซื้อ', 
-        '1002': 'QC', 
-        '1003': 'ซ่อมบำรุง', 
-        '1004': 'ฝ่ายผลิต', 
-        '1005': 'HR',
+        '1001': 'จัดซื้อ', '1002': 'QC', '1003': 'ซ่อมบำรุง', '1004': 'ฝ่ายผลิต', '1005': 'HR',
         '9999': 'MANAGER_ROLE' 
     }
 };
@@ -98,6 +94,7 @@ if (memoForm) {
             const { data, error } = await db.from('memos').insert([payload]).select();
             if (error) throw error;
             const newId = data[0].id;
+            
             try {
                 const headEmail = CONFIG.departmentHeads[payload.from_dept];
                 const adminLink = window.location.origin + '/admin.html';
@@ -109,10 +106,13 @@ if (memoForm) {
                     });
                 }
             } catch(e) { console.warn('Email failed', e); }
-            if(confirm('✅ บันทึกสำเร็จ!\nต้องการเปิดหน้าพิมพ์ PDF เลยหรือไม่?')) {
+
+            // [FIXED] ใช้ confirm เพื่อหยุดรอก่อนเปิดหน้าใหม่
+            if(confirm('✅ บันทึก Memo เรียบร้อย!\n\nกด "ตกลง" เพื่อเปิดหน้าพิมพ์เอกสารเก็บไว้\nกด "ยกเลิก" เพื่อกลับหน้าหลัก')) {
                 window.open(`view_memo.html?id=${newId}`, '_blank');
             }
-            window.location.reload();
+            window.location.href = 'index.html'; 
+
         } catch (err) { console.error(err); alert('Error: ' + err.message); btn.disabled = false; btn.innerText = originalText; }
     });
 }
@@ -187,6 +187,7 @@ if (prForm) {
             const { data, error } = await db.from('purchase_requests').insert([payload]).select();
             if (error) throw error;
             const newId = data[0].id;
+            
             try {
                 const adminLink = window.location.origin + '/admin.html';
                 if(isEmailEnabled) {
@@ -197,10 +198,14 @@ if (prForm) {
                     });
                 }
             } catch (emailErr) { console.error("Email sending failed but data saved:", emailErr); }
-            if(confirm('✅ ส่งคำขอ PR เรียบร้อย!\nคุณต้องการเปิดหน้าสำหรับ "พิมพ์/บันทึก PDF" เพื่อเก็บเป็นหลักฐานเลยหรือไม่?')) {
+
+            // [FIXED] ปรับ UX ให้ชัดเจนและรอการกด
+            if(confirm('✅ ส่งคำขอ PR เรียบร้อย!\n\nกด "ตกลง" เพื่อเปิดหน้าพิมพ์เอกสารต้นฉบับเก็บไว้ (แนะนำ)\nกด "ยกเลิก" เพื่อกลับหน้าเมนูหลัก')) {
                 window.open(`view_pr.html?id=${newId}&mode=original`, '_blank');
             }
+            // กลับหน้าหลัก
             window.location.href = 'index.html'; 
+
         } catch (err) { console.error(err); alert('Error: ' + err.message); btn.disabled = false; btn.innerText = originalText; }
     });
 }
@@ -322,7 +327,7 @@ window.openDetailModal = function(id) {
         }
 
         itemsToShow.forEach((item, index) => {
-            // [FIXED] ใช้ index เป็น ID เพื่อความแม่นยำ
+            // [FIXED] ใช้ index ที่แท้จริงในการสร้าง ID
             let realIndex = currentDoc.items.indexOf(item); 
             let actionHtml = '';
             let reasonHtml = '';
@@ -392,7 +397,7 @@ window.toggleReason = function(index) {
     }
 }
 
-// [FIXED] แก้ Logic เช็ค Error ที่ถูกต้อง
+// [FIXED] Logic บันทึก: ป้องกันการเขียนทับรายการที่หัวหน้าไม่อนุมัติ
 window.finalizeApproval = async function() {
     const btn = document.querySelector('.btn-success');
     btn.disabled = true; btn.innerText = '⏳ กำลังบันทึก...';
@@ -408,29 +413,40 @@ window.finalizeApproval = async function() {
         if (currentDocType === 'pr') {
             let hasRejectionWithoutReason = false;
             
-            // ใช้ map เพื่อสร้าง array ใหม่ที่อัปเดตแล้ว
+            // วนลูปสร้างรายการใหม่ โดยไม่เขียนทับของเดิมถ้าหา input ไม่เจอ
             const updatedItems = currentDoc.items.map((item, index) => {
                 const checkbox = document.getElementById(`check-${index}`);
                 const reasonInput = document.getElementById(`reason-${index}`);
                 
-                let isApproved = true;
-                let reason = '';
-
-                if (checkbox) {
-                    isApproved = checkbox.checked;
-                    reason = reasonInput ? reasonInput.value : '';
-                    if (!isApproved && !reason.trim()) hasRejectionWithoutReason = true;
-                } else {
-                    isApproved = (item.status === 'approved' || item.status === 'pending');
+                // กรณี: Manager (checkbox จะเป็น null สำหรับรายการที่หัวหน้าไม่อนุมัติ เพราะถูก filter ออก)
+                // ดังนั้นถ้าหา checkbox ไม่เจอ ให้คืนค่า item เดิมกลับไปเลย (ห้ามแก้!)
+                if (!checkbox) {
+                    return item; 
                 }
+
+                // กรณี: มี checkbox (รายการที่แสดงผลอยู่)
+                const isApproved = checkbox.checked;
+                const reason = reasonInput ? reasonInput.value : '';
+                
+                if (!isApproved && !reason.trim()) hasRejectionWithoutReason = true;
 
                 const roleName = currentUserRole === 'head' ? 'หัวหน้าแผนก' : 'ผู้บริหาร';
                 
-                return {
-                    ...item, // เก็บค่าเดิม (code, qty, etc.)
-                    status: isApproved ? 'approved' : 'rejected',
-                    remark: isApproved ? '' : `${reason} (โดย: ${roleName})`
-                };
+                // ถ้าไม่อนุมัติ -> แก้สถานะ + ใส่เหตุผล
+                if (!isApproved) {
+                    return {
+                        ...item,
+                        status: 'rejected',
+                        remark: `${reason} (โดย: ${roleName})`
+                    };
+                } else {
+                    // ถ้าอนุมัติ -> แก้สถานะ + ล้างเหตุผล
+                    return {
+                        ...item,
+                        status: 'approved',
+                        remark: ''
+                    };
+                }
             });
 
             if (hasRejectionWithoutReason) {
@@ -465,11 +481,11 @@ window.finalizeApproval = async function() {
 
         if (currentDocType === 'pr') updatePayload.items = currentDoc.items;
 
-        // [FIXED] ดักจับ Error ที่ถูกต้อง
+        // บันทึกลง DB
         let { error } = await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
 
         if (error) {
-            // ถ้า Error 400 (Bad Request) แสดงว่าคอลัมน์เวลาไม่มี -> ให้ลองบันทึกแบบไม่ใส่เวลา
+            // ถ้า Error 400 แสดงว่าไม่มี Column เวลา -> ลองบันทึกแบบไม่ใส่เวลา
             if (error.code === 'PGRST204' || error.code === '42703' || (error.message && error.message.includes('400'))) {
                 console.warn("Database missing timestamp columns. Retrying without timestamp...");
                 delete updatePayload.head_approved_at;
@@ -479,9 +495,9 @@ window.finalizeApproval = async function() {
             }
         }
 
-        if (error) throw error; // ถ้ายัง Error อยู่ ให้โยนออกไปที่ Catch
+        if (error) throw error;
 
-        // ส่งเมล (Safe Mode)
+        // ส่งเมล (ใส่ try-catch กันพัง)
         try {
             if (emailTo && isEmailEnabled) {
                 btn.innerText = '⏳ กำลังส่งเมล...';
