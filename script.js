@@ -64,7 +64,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 
-// ================= 3. MEMO FORM =================
+// ================= 3. MEMO FORM (ถามก่อนพิมพ์) =================
 const memoForm = document.getElementById('memoForm');
 if (memoForm) {
     memoForm.addEventListener('submit', async (e) => {
@@ -101,7 +101,7 @@ if (memoForm) {
             if (error) throw error;
             const newId = data[0].id;
 
-            // ส่งเมลหาผู้อนุมัติ
+            // ส่งเมลหาผู้อนุมัติ (คงไว้เพื่อให้ระบบเดิน)
             const headEmail = CONFIG.departmentHeads[payload.from_dept];
             const adminLink = window.location.origin + '/admin.html';
             if (headEmail) {
@@ -112,6 +112,7 @@ if (memoForm) {
                 });
             }
             
+            // ถามผู้ใช้ให้พิมพ์ PDF ทันที
             if(confirm('✅ บันทึก Memo เรียบร้อย!\nคุณต้องการเปิดหน้าสำหรับ "พิมพ์/บันทึก PDF" เลยหรือไม่?')) {
                 window.open(`view_memo.html?id=${newId}`, '_blank');
             }
@@ -121,7 +122,7 @@ if (memoForm) {
     });
 }
 
-// ================= 4. PR FORM =================
+// ================= 4. PR FORM (ถามก่อนพิมพ์) =================
 window.addItemRow = function() {
     const container = document.getElementById('itemsContainer');
     if (!container) return; 
@@ -196,7 +197,6 @@ if (prForm) {
             if (error) throw error;
             const newId = data[0].id;
 
-            // ส่งเมลหาผู้อนุมัติ
             const adminLink = window.location.origin + '/admin.html';
             await emailjs.send(CONFIG.emailServiceId, CONFIG.emailTemplateId_Master, { 
                 to_email: headEmail, 
@@ -204,6 +204,7 @@ if (prForm) {
                 html_content: `<h3>เรียน ผู้อนุมัติเบื้องต้น (${dept})</h3><p>มีรายการขอซื้อใหม่จาก <b>${payload.requester}</b> รอการตรวจสอบ</p><p>เลขที่ PR: ${payload.pr_number}</p><p><a href="${adminLink}">คลิกเพื่อเข้าสู่ระบบอนุมัติ</a></p>` 
             });
 
+            // ถามผู้ใช้ให้พิมพ์ PDF ทันที
             if(confirm('✅ ส่งคำขอ PR เรียบร้อย!\nคุณต้องการเปิดหน้าสำหรับ "พิมพ์/บันทึก PDF" เพื่อเก็บเป็นหลักฐานเลยหรือไม่?')) {
                 window.open(`view_pr.html?id=${newId}&mode=original`, '_blank');
             }
@@ -417,7 +418,7 @@ window.toggleReason = function(index) {
     }
 }
 
-// [Logic ปุ่มเขียว]
+// [Logic ปุ่มเขียว: บันทึก (รวมเวลา) + ไม่ส่งเมลหา Requester]
 window.finalizeApproval = async function() {
     const btn = document.querySelector('.btn-success');
     btn.disabled = true; btn.innerText = '⏳ กำลังประมวลผล...';
@@ -486,6 +487,7 @@ window.finalizeApproval = async function() {
                 <p>1. <a href="${linkApproved}" style="font-weight:bold; color:green;">📂 รายการที่อนุมัติ (PO)</a></p>
                 <p>2. <a href="${linkOriginal}" style="font-weight:bold; color:gray;">📄 ต้นฉบับทั้งหมด (Log)</a></p>
             `;
+            // ตัดการส่งอีเมลหา Requester ออกตามที่ขอ
         }
 
         if (currentDocType === 'pr') updatePayload.items = currentDoc.items;
@@ -493,6 +495,7 @@ window.finalizeApproval = async function() {
         const { error } = await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
         if (error) throw error;
 
+        // ยังส่งเมลหา Manager/Purchasing ตามปกติ
         if (emailTo) {
             await emailjs.send(CONFIG.emailServiceId, CONFIG.emailTemplateId_Master, { 
                 to_email: emailTo, subject: emailSubject, html_content: emailContent 
@@ -521,13 +524,15 @@ window.rejectDocument = async function() {
         }
         await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
         
+        // ตัดการส่งเมลหา Requester ออกตามที่ขอ
+        
         alert('❌ ตีกลับเอกสารเรียบร้อย');
         bootstrap.Modal.getInstance(document.getElementById('detailModal')).hide();
         loadData();
     } catch(err) { console.error(err); alert('Error: ' + err.message); } finally { if(btn) { btn.disabled = false; btn.innerText = 'ตีกลับเอกสาร'; } }
 }
 
-// ================= 7. VIEW / PRINT LOADERS (AUTO PAGINATION) =================
+// ================= 7. VIEW / PRINT LOADERS (PAGINATION LOGIC) =================
 const formatDate = (isoStr) => {
     if(!isoStr) return "";
     const d = new Date(isoStr);
@@ -546,23 +551,19 @@ async function loadPRForPrint() {
         let displayItems = pr.items;
         if (mode === 'approved') displayItems = pr.items.filter(item => item.status === 'approved');
 
-        // ==== PAGINATION LOGIC ====
-        const ITEMS_PER_PAGE = 12; // จำนวนสินค้าต่อหน้า (ปรับได้)
+        // ==== PAGINATION LOGIC: แบ่งหน้าอัตโนมัติ ====
+        const ITEMS_PER_PAGE = 12; // 12 รายการต่อหน้า (กำลังสวย)
         const totalItems = displayItems.length;
         const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
         const container = document.getElementById('pages-container');
         const template = document.getElementById('page-template').innerHTML;
 
-        container.innerHTML = ''; // Clear container
+        container.innerHTML = ''; // Clear
 
         for (let i = 0; i < totalPages; i++) {
-            // สร้างหน้าใหม่จาก Template
+            // สร้างหน้าใหม่
             const pageDiv = document.createElement('div');
             pageDiv.innerHTML = template;
-            
-            // ดึง Element ในหน้านั้นๆ มาแก้ไข
-            const page = pageDiv.querySelector('.page');
-            const tbody = pageDiv.querySelector('.v_tableBody');
             
             // ใส่ข้อมูล Header
             pageDiv.querySelector('.v_pr_number').innerText = pr.pr_number;
@@ -575,10 +576,11 @@ async function loadPRForPrint() {
             if (mode === 'approved') pageDiv.querySelector('.doc-title').innerHTML += ' <span class="text-success" style="font-size:16px;">(รายการที่อนุมัติ)</span>';
             else if (mode === 'original') pageDiv.querySelector('.doc-title').innerHTML += ' <span class="text-secondary" style="font-size:16px;">(ต้นฉบับทั้งหมด)</span>';
 
-            // ใส่รายการสินค้า (เฉพาะส่วนของหน้านี้)
+            // ใส่รายการสินค้า (เฉพาะของหน้านี้)
             const start = i * ITEMS_PER_PAGE;
             const end = start + ITEMS_PER_PAGE;
             const pageItems = displayItems.slice(start, end);
+            const tbody = pageDiv.querySelector('.v_tableBody');
 
             pageItems.forEach((item, index) => {
                 let globalIndex = start + index + 1;
@@ -595,7 +597,7 @@ async function loadPRForPrint() {
                 tbody.innerHTML += `<tr style="${rowStyle}"><td class="text-center">${globalIndex}</td><td>${item.code || '-'}</td><td>${item.description}</td><td class="text-center">${item.quantity}</td><td class="text-center">${item.unit}</td><td class="text-center">${statusBadge}</td></tr>`;
             });
 
-            // เติมบรรทัดว่างให้เต็มตาราง (เพื่อความสวยงาม)
+            // เติมบรรทัดว่างให้เต็มตาราง
             const emptyRows = ITEMS_PER_PAGE - pageItems.length;
             for(let k=0; k<emptyRows; k++) {
                 tbody.innerHTML += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>`;
@@ -604,10 +606,10 @@ async function loadPRForPrint() {
             // จัดการ Footer (ลายเซ็น)
             const footer = pageDiv.querySelector('.footer-section');
             if (i < totalPages - 1) {
-                // ถ้าไม่ใช่หน้าสุดท้าย ให้ซ่อนส่วนลายเซ็น
+                // ถ้าไม่ใช่หน้าสุดท้าย ให้ซ่อนลายเซ็น
                 footer.style.display = 'none'; 
             } else {
-                // หน้าสุดท้าย -> ใส่ข้อมูลลายเซ็น
+                // หน้าสุดท้าย -> แสดงลายเซ็น + วันที่อนุมัติ
                 pageDiv.querySelector('.v_remark').innerText = pr.header_remark || '-';
                 pageDiv.querySelector('.v_sign_requester').innerText = pr.requester;
                 pageDiv.querySelector('.v_sign_date_req').innerText = "วันที่ " + new Date(pr.created_at).toLocaleDateString('th-TH');
