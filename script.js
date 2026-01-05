@@ -190,7 +190,6 @@ if (prForm) {
             const { error } = await db.from('purchase_requests').insert([payload]);
             if (error) throw error;
 
-            btn.innerText = '⏳ ส่งอีเมล...';
             const adminLink = window.location.origin + '/admin.html';
             await emailjs.send(CONFIG.emailServiceId, CONFIG.emailTemplateId_Master, { 
                 to_email: headEmail, 
@@ -309,7 +308,7 @@ async function updateBadges() {
     if(badgeMemo) { if(countMemo > 0) { badgeMemo.innerText = countMemo; badgeMemo.style.display = 'inline-block'; } else { badgeMemo.style.display = 'none'; } }
 }
 
-// ================= 6. MODAL & APPROVAL LOGIC (แก้ไขจุดนี้ให้ Manager เลือกได้) =================
+// ================= 6. MODAL & APPROVAL LOGIC =================
 window.openDetailModal = function(id) {
     currentDoc = allDocs.find(d => String(d.id) === String(id));
     if (!currentDoc) return;
@@ -330,7 +329,6 @@ window.openDetailModal = function(id) {
         const tbody = document.getElementById('pr_items_body');
         tbody.innerHTML = '';
         
-        // กรองรายการสินค้า: ถ้าเป็น Manager ให้เห็นเฉพาะที่ Head อนุมัติมาแล้ว
         let itemsToShow = currentDoc.items;
         if (currentUserRole === 'manager') {
             itemsToShow = currentDoc.items.filter(item => item.status === 'approved');
@@ -342,12 +340,9 @@ window.openDetailModal = function(id) {
             let reasonHtml = '';
 
             if (currentMode === 'history') {
-                // โหมดดูประวัติ (แสดงผลลัพธ์)
                 actionHtml = item.status === 'approved' ? '<span class="text-success">✅ อนุมัติ</span>' : '<span class="text-danger">❌ ไม่อนุมัติ</span>';
                 reasonHtml = item.remark || '-';
             } else {
-                // โหมดรออนุมัติ (ทั้ง Head และ Manager เห็นเหมือนกัน คือมีปุ่มกด)
-                // Manager สามารถเปลี่ยนสถานะจาก Approved (โดย Head) เป็น Rejected ได้
                 actionHtml = `
                     <div class="form-check form-switch d-inline-block">
                         <input class="form-check-input item-check" type="checkbox" checked onchange="toggleReason(${realIndex})" data-index="${realIndex}">
@@ -372,7 +367,6 @@ window.openDetailModal = function(id) {
         }
 
     } else {
-        // Memo Logic
         document.getElementById('doc_type_title').innerText = "บันทึกข้อความ (Memo)";
         document.getElementById('pr_form_layout').style.display = 'none';
         document.getElementById('memo_form_layout').style.display = 'block';
@@ -407,21 +401,14 @@ window.toggleReason = function(index) {
     const checkbox = document.querySelector(`.item-check[data-index="${index}"]`);
     const reasonInput = document.getElementById(`reason-${index}`);
     const label = document.getElementById(`label-${index}`);
-    
     if (checkbox.checked) {
-        reasonInput.style.display = 'none';
-        reasonInput.value = '';
-        label.innerText = 'อนุมัติ';
-        label.className = 'form-check-label text-success fw-bold';
+        reasonInput.style.display = 'none'; reasonInput.value = ''; label.innerText = 'อนุมัติ'; label.className = 'form-check-label text-success fw-bold';
     } else {
-        reasonInput.style.display = 'block';
-        reasonInput.focus();
-        label.innerText = 'ไม่อนุมัติ';
-        label.className = 'form-check-label text-danger fw-bold';
+        reasonInput.style.display = 'block'; reasonInput.focus(); label.innerText = 'ไม่อนุมัติ'; label.className = 'form-check-label text-danger fw-bold';
     }
 }
 
-// [Logic ปุ่มเขียว: อนุมัติ (Head & Manager ใช้ Logic เดียวกันในการวนลูป Checkbox)]
+// [Logic ปุ่มเขียว: บันทึก + แจ้งเตือนครบทุกคน]
 window.finalizeApproval = async function() {
     const btn = document.querySelector('.btn-success');
     btn.disabled = true; btn.innerText = '⏳ กำลังประมวลผล...';
@@ -433,23 +420,23 @@ window.finalizeApproval = async function() {
         let emailTo = '';
         let emailContent = '';
 
-        // --- ส่วนที่เพิ่ม: Logic การอ่านค่า Checkbox (ใช้ร่วมกันทั้ง Head และ Manager) ---
+        // --- Update รายสินค้า ---
         if (currentDocType === 'pr') {
             const checkboxes = document.querySelectorAll('.item-check');
             let hasRejectionWithoutReason = false;
-
             checkboxes.forEach(cb => {
                 const idx = cb.getAttribute('data-index');
                 const isApproved = cb.checked;
-                const reason = document.getElementById(`reason-${idx}`).value;
+                const reasonInput = document.getElementById(`reason-${idx}`).value;
+                if (!isApproved && !reasonInput.trim()) hasRejectionWithoutReason = true;
 
-                if (!isApproved && !reason.trim()) hasRejectionWithoutReason = true;
-
-                // บันทึกสถานะล่าสุด (ถ้า Manager กดไม่อนุมัติ จะทับของ Head ไปเลย)
-                currentDoc.items[idx].status = isApproved ? 'approved' : 'rejected';
-                currentDoc.items[idx].remark = isApproved ? '' : reason;
-                if(currentUserRole === 'manager' && !isApproved) {
-                    currentDoc.items[idx].remark += ' (ผู้บริหารไม่อนุมัติ)'; // เพิ่มต่อท้ายให้รู้ว่าใคร Reject
+                const roleName = currentUserRole === 'head' ? 'หัวหน้าแผนก' : 'ผู้บริหาร';
+                if (!isApproved) {
+                    currentDoc.items[idx].status = 'rejected';
+                    currentDoc.items[idx].remark = `${reasonInput} (โดย: ${roleName})`;
+                } else {
+                    currentDoc.items[idx].status = 'approved';
+                    currentDoc.items[idx].remark = '';
                 }
             });
 
@@ -459,16 +446,18 @@ window.finalizeApproval = async function() {
                 return;
             }
         }
-        // -------------------------------------------------------------
 
+        // --- Logic การส่งเมล ---
         if (currentUserRole === 'head') {
             nextStatus = 'pending_manager';
             emailTo = CONFIG.managerEmail;
             emailSubject = `[อนุมัติขั้นที่ 1] PR ${currentDoc.pr_number} ผ่านการตรวจสอบแล้ว`;
-            emailContent = `<h3>เรียน ผู้บริหาร</h3><p>PR เลขที่ ${currentDoc.pr_number} (แผนก ${currentDoc.department}) ผ่านการตรวจสอบจากหัวหน้าแผนกแล้ว</p><p>กรุณาตรวจสอบและอนุมัติขั้นสุดท้าย</p><a href="${window.location.origin}/admin.html">เข้าสู่ระบบ</a>`;
+            emailContent = `<h3>เรียน ผู้บริหาร</h3><p>PR เลขที่ ${currentDoc.pr_number} ผ่านการตรวจสอบจากหัวหน้าแผนกแล้ว</p><a href="${window.location.origin}/admin.html">เข้าสู่ระบบ</a>`;
 
         } else if (currentUserRole === 'manager') {
             nextStatus = 'processed';
+            
+            // 1. ส่งเมลหาฝ่ายจัดซื้อ (Purchasing)
             emailTo = CONFIG.purchasingEmail;
             emailSubject = `[Approved] คำสั่งซื้อ PR ${currentDoc.pr_number} อนุมัติแล้ว`;
             
@@ -477,12 +466,26 @@ window.finalizeApproval = async function() {
 
             emailContent = `
                 <h3>เรียน ฝ่ายจัดซื้อ</h3>
-                <p>PR เลขที่ <b>${currentDoc.pr_number}</b> ได้รับการอนุมัติจากผู้บริหารเรียบร้อยแล้ว</p>
+                <p>PR เลขที่ <b>${currentDoc.pr_number}</b> อนุมัติเรียบร้อยแล้ว</p>
                 <hr>
-                <p><b>กรุณาดำเนินการดังนี้:</b></p>
-                <p>1. <a href="${linkApproved}" style="font-weight:bold; color:green;">📂 ไฟล์ 1: รายการที่อนุมัติ</a> (สำหรับออก PO)<br><small><i>(เฉพาะรายการที่ผ่านการอนุมัติ)</i></small></p>
-                <p>2. <a href="${linkOriginal}" style="font-weight:bold; color:gray;">📄 ไฟล์ 2: ต้นฉบับทั้งหมด</a> (Log)<br><small><i>(แสดงทุกรายการ + รายการที่ถูกปฏิเสธ)</i></small></p>
+                <p>1. <a href="${linkApproved}" style="font-weight:bold; color:green;">📂 รายการที่อนุมัติ (PO)</a></p>
+                <p>2. <a href="${linkOriginal}" style="font-weight:bold; color:gray;">📄 ต้นฉบับทั้งหมด (Log)</a></p>
             `;
+
+            // 2. [เพิ่ม] ส่งเมลแจ้งผลกลับไปหา "ผู้ขอ (Requester)"
+            if (currentDoc.email) {
+                await emailjs.send(CONFIG.emailServiceId, CONFIG.emailTemplateId_Master, { 
+                    to_email: currentDoc.email, 
+                    subject: `[Approved] อนุมัติแล้ว: ${currentDoc.pr_number || currentDoc.memo_no}`, 
+                    html_content: `
+                        <h3>เรียน คุณ${currentDoc.requester || 'ผู้ขอ'}</h3>
+                        <p>รายการ <b>${currentDoc.pr_number || currentDoc.memo_no}</b> ได้รับการอนุมัติจากผู้บริหารเรียบร้อยแล้ว</p>
+                        <hr>
+                        <p>เอกสารถูกส่งต่อไปยังฝ่ายจัดซื้อเพื่อดำเนินการสั่งซื้อต่อไป</p>
+                        <p>สามารถติดตามสถานะได้ที่ระบบ</p>
+                    ` 
+                });
+            }
         }
 
         const updatePayload = { status: nextStatus };
@@ -491,6 +494,7 @@ window.finalizeApproval = async function() {
         const { error } = await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
         if (error) throw error;
 
+        // ส่งเมลหลัก (หาหัวหน้า หรือ หาจัดซื้อ)
         if (emailTo) {
             await emailjs.send(CONFIG.emailServiceId, CONFIG.emailTemplateId_Master, { 
                 to_email: emailTo, subject: emailSubject, html_content: emailContent 
@@ -516,7 +520,11 @@ window.rejectDocument = async function() {
         let updatePayload = { status: 'rejected' };
         
         if(currentDocType === 'pr') {
-            currentDoc.items.forEach(item => { item.status = 'rejected'; item.remark = 'ตีกลับทั้งใบ: ' + comment; });
+            const roleName = currentUserRole === 'head' ? 'หัวหน้าแผนก' : 'ผู้บริหาร';
+            currentDoc.items.forEach(item => { 
+                item.status = 'rejected'; 
+                item.remark = `ตีกลับทั้งใบโดย ${roleName}: ${comment}`; 
+            });
             updatePayload.items = currentDoc.items;
         }
         await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
@@ -560,9 +568,17 @@ async function loadPRForPrint() {
         if (mode === 'approved') displayItems = pr.items.filter(item => item.status === 'approved');
 
         displayItems.forEach((item, index) => {
-            let statusBadge = item.status === 'approved' ? '<span class="fw-bold text-success">✅ อนุมัติ</span>' : `<span class="text-danger fw-bold">❌ ไม่อนุมัติ</span><br><small class="text-danger">(${item.remark})</small>`;
-            if (item.status === 'pending') statusBadge = '<span class="text-warning">รอพิจารณา</span>';
-            let rowStyle = (item.status === 'rejected' && mode === 'original') ? 'background-color: #fff5f5;' : '';
+            let statusBadge = '';
+            let rowStyle = '';
+
+            if (item.status === 'approved') {
+                statusBadge = '<span class="fw-bold text-success">✅ อนุมัติ</span>';
+            } else if (item.status === 'rejected') {
+                statusBadge = `<span class="text-danger fw-bold">❌ ไม่อนุมัติ</span><br><span class="text-danger small d-block mt-1">${item.remark}</span>`;
+                if(mode === 'original') rowStyle = 'background-color: #fff5f5;'; 
+            } else {
+                statusBadge = '<span class="text-warning">รอพิจารณา</span>';
+            }
 
             tbody.innerHTML += `<tr style="${rowStyle}"><td class="text-center">${index + 1}</td><td>${item.code || '-'}</td><td>${item.description}</td><td class="text-center">${item.quantity}</td><td class="text-center">${item.unit}</td><td class="text-center">${statusBadge}</td></tr>`;
         });
