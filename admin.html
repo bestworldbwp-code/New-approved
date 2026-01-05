@@ -40,7 +40,11 @@
 <nav class="navbar navbar-custom fixed-top">
     <div class="container-fluid px-4">
         <div class="d-flex align-items-center"><img src="" class="app-logo me-3" alt="Logo" style="height: 40px;"><div><h6 class="mb-0 fw-bold text-dark">Admin Dashboard</h6><small class="text-muted" id="pageTitle">กำลังโหลดข้อมูล...</small></div></div>
-        <div class="d-flex gap-2"><button onclick="loadData()" class="btn btn-light rounded-circle shadow-sm" title="รีเฟรชข้อมูล"><i class="bi bi-arrow-clockwise text-primary"></i></button><a href="index.html" class="btn btn-light rounded-circle shadow-sm" title="ออกสู่หน้าหลัก"><i class="bi bi-box-arrow-right text-danger"></i></a></div>
+        <div class="d-flex gap-2">
+            <button onclick="exportToCSV()" class="btn btn-success rounded-pill shadow-sm px-3" title="ดาวน์โหลดรายงาน"><i class="bi bi-file-earmark-spreadsheet me-2"></i>ดาวน์โหลด Log</button>
+            <button onclick="loadData()" class="btn btn-light rounded-circle shadow-sm" title="รีเฟรชข้อมูล"><i class="bi bi-arrow-clockwise text-primary"></i></button>
+            <a href="index.html" class="btn btn-light rounded-circle shadow-sm" title="ออกสู่หน้าหลัก"><i class="bi bi-box-arrow-right text-danger"></i></a>
+        </div>
     </div>
 </nav>
 <div class="container-fluid px-4" style="margin-top: 100px; padding-bottom: 50px;">
@@ -56,49 +60,7 @@
         <div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0 text-nowrap align-middle"><thead><tr><th width="15%" class="ps-4">เลขที่เอกสาร</th><th width="15%">วันที่</th><th width="30%">รายละเอียด (จาก / เรื่อง)</th><th width="20%">สถานะปัจจุบัน</th><th width="20%" class="text-center pe-4">จัดการ</th></tr></thead><tbody id="dataTableBody"></tbody></table></div></div>
     </div>
 </div>
-<div class="modal fade" id="detailModal" tabindex="-1">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <div class="modal-content border-0" style="background-color: #f3f4f6;">
-            <div class="modal-header border-0 pb-0"><h5 class="modal-title fw-bold text-dark ms-2"><i class="bi bi-eye-fill me-2"></i> ตรวจสอบเอกสาร</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <div class="paper-preview mx-auto rounded shadow-sm" style="max-width: 210mm;">
-                    <div class="text-center mb-4 doc-header"><img src="" class="app-logo mb-2" style="height: 60px;"><h4 class="fw-bold m-0 text-dark">บริษัท เบสท์เวิลด์ อินเตอร์พลาส จำกัด</h4><div id="doc_type_title" class="fw-bold mt-2 fs-5 text-secondary"></div></div>
-                    
-                    <div id="pr_form_layout" style="display:none;">
-                        <div class="row g-3 mb-4"><div class="col-6">เลขที่: <span id="pr_no" class="field-value"></span></div><div class="col-6">วันที่ต้องการ: <span id="pr_req_date" class="field-value text-danger"></span></div><div class="col-6">ผู้ขอซื้อ: <span id="pr_requester" class="field-value"></span></div><div class="col-6">แผนก: <span id="pr_dept" class="field-value"></span></div></div>
-                        <div class="table-responsive rounded border"><table class="table table-sm mb-0 table-striped"><thead class="table-light"><tr class="text-center"><th>รหัส</th><th>รายการ</th><th>จำนวน</th><th>หน่วย</th><th width="20%">ผลการพิจารณา</th><th width="25%">เหตุผล (ถ้าไม่อนุมัติ)</th></tr></thead><tbody id="pr_items_body"></tbody></table></div>
-                        <div class="mt-3 p-3 bg-light rounded border border-light"><strong>หมายเหตุ:</strong> <span id="pr_remark" class="text-muted"></span></div>
-                    </div>
-
-                    <div id="memo_form_layout" style="display:none;">
-                        <div class="mb-4">
-                            <div class="row mb-2"><div class="col-2 fw-bold">หน่วยงาน</div><div class="col-10 border-bottom border-dark dotted"><span id="memo_from"></span></div></div>
-                            <div class="row mb-2"><div class="col-1 fw-bold">ที่</div><div class="col-5 border-bottom border-dark dotted"><span id="memo_no"></span></div><div class="col-1 fw-bold text-end">วันที่</div><div class="col-5 border-bottom border-dark dotted"><span id="memo_date"></span></div></div>
-                            <div class="row mb-2"><div class="col-1 fw-bold">เรื่อง</div><div class="col-11 border-bottom border-dark dotted"><span id="memo_subject"></span></div></div>
-                            <div class="row mb-3"><div class="col-1 fw-bold">เรียน</div><div class="col-11 fw-bold"><span id="memo_to"></span></div></div>
-                        </div>
-                        <div class="p-4 border rounded bg-white" style="min-height: 250px;"><p id="memo_content" style="white-space: pre-wrap;"></p></div>
-                    </div>
-
-                    <div id="attachment_area" class="mt-4 p-3 bg-primary bg-opacity-10 border border-primary rounded" style="display:none;"><i class="bi bi-paperclip me-2"></i> <strong>ไฟล์แนบ:</strong> <a href="#" id="attachment_link" target="_blank" class="text-decoration-none fw-bold">คลิกเพื่อเปิดดูเอกสาร</a></div>
-                    
-                    <div class="row text-center mt-5 pt-4 g-4">
-                        <div class="col-4"><div class="mb-2 fw-bold">ผู้จัดทำ</div><div class="mb-1 text-primary" id="sign_requester_name" style="height:30px;"></div><div class="border-top w-75 mx-auto"></div></div>
-                        <div class="col-4"><div class="mb-2 fw-bold">ผู้อนุมัติเบื้องต้น</div><div class="mb-1 fw-bold" id="sign_head_status" style="height:30px;"></div><div class="border-top w-75 mx-auto"></div></div>
-                        <div class="col-4"><div class="mb-2 fw-bold">ผู้อนุมัติ (ผู้บริหาร)</div><div class="mb-1 fw-bold" id="sign_manager_status" style="height:30px;"></div><div class="border-top w-75 mx-auto"></div></div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer border-0 bg-white shadow-top py-3 d-flex justify-content-between align-items-center">
-                <div class="flex-grow-1 me-3"><input type="text" id="approval_comment" class="form-control" placeholder="ระบุเหตุผลรวม (กรณีตีกลับทั้งใบ)..."></div>
-                <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-outline-danger px-4 rounded-pill fw-bold" onclick="rejectDocument()"><i class="bi bi-x-circle me-2"></i> ตีกลับทั้งหมด</button>
-                    <button type="button" class="btn btn-success px-5 rounded-pill shadow-sm fw-bold" onclick="finalizeApproval()"><i class="bi bi-check-lg me-2"></i> อนุมัติ / ส่งต่อ</button>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+<div class="modal fade" id="detailModal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content border-0" style="background-color: #f3f4f6;"><div class="modal-header border-0 pb-0"><h5 class="modal-title fw-bold text-dark ms-2"><i class="bi bi-eye-fill me-2"></i> ตรวจสอบเอกสาร</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="paper-preview mx-auto rounded shadow-sm" style="max-width: 210mm;"><div class="text-center mb-4 doc-header"><img src="" class="app-logo mb-2" style="height: 60px;"><h4 class="fw-bold m-0 text-dark">บริษัท เบสท์เวิลด์ อินเตอร์พลาส จำกัด</h4><div id="doc_type_title" class="fw-bold mt-2 fs-5 text-secondary"></div></div><div id="pr_form_layout" style="display:none;"><div class="row g-3 mb-4"><div class="col-6">เลขที่: <span id="pr_no" class="field-value"></span></div><div class="col-6">วันที่ต้องการ: <span id="pr_req_date" class="field-value text-danger"></span></div><div class="col-6">ผู้ขอซื้อ: <span id="pr_requester" class="field-value"></span></div><div class="col-6">แผนก: <span id="pr_dept" class="field-value"></span></div></div><div class="table-responsive rounded border"><table class="table table-sm mb-0 table-striped"><thead class="table-light"><tr class="text-center"><th>รหัส</th><th>รายการ</th><th>จำนวน</th><th>หน่วย</th><th width="20%">ผลการพิจารณา</th><th width="25%">เหตุผล (ถ้าไม่อนุมัติ)</th></tr></thead><tbody id="pr_items_body"></tbody></table></div><div class="mt-3 p-3 bg-light rounded border border-light"><strong>หมายเหตุ:</strong> <span id="pr_remark" class="text-muted"></span></div></div><div id="memo_form_layout" style="display:none;"><div class="mb-4"><div class="row mb-2"><div class="col-2 fw-bold">หน่วยงาน</div><div class="col-10 border-bottom border-dark dotted"><span id="memo_from"></span></div></div><div class="row mb-2"><div class="col-1 fw-bold">ที่</div><div class="col-5 border-bottom border-dark dotted"><span id="memo_no"></span></div><div class="col-1 fw-bold text-end">วันที่</div><div class="col-5 border-bottom border-dark dotted"><span id="memo_date"></span></div></div><div class="row mb-2"><div class="col-1 fw-bold">เรื่อง</div><div class="col-11 border-bottom border-dark dotted"><span id="memo_subject"></span></div></div><div class="row mb-3"><div class="col-1 fw-bold">เรียน</div><div class="col-11 fw-bold"><span id="memo_to"></span></div></div></div><div class="p-4 border rounded bg-white" style="min-height: 250px;"><p id="memo_content" style="white-space: pre-wrap;"></p></div></div><div id="attachment_area" class="mt-4 p-3 bg-primary bg-opacity-10 border border-primary rounded" style="display:none;"><i class="bi bi-paperclip me-2"></i> <strong>ไฟล์แนบ:</strong> <a href="#" id="attachment_link" target="_blank" class="text-decoration-none fw-bold">คลิกเพื่อเปิดดูเอกสาร</a></div><div class="row text-center mt-5 pt-4 g-4"><div class="col-4"><div class="mb-2 fw-bold">ผู้จัดทำ</div><div class="mb-1 text-primary" id="sign_requester_name" style="height:30px;"></div><div class="border-top w-75 mx-auto"></div></div><div class="col-4"><div class="mb-2 fw-bold">ผู้อนุมัติเบื้องต้น</div><div class="mb-1 fw-bold" id="sign_head_status" style="height:30px;"></div><div class="border-top w-75 mx-auto"></div></div><div class="col-4"><div class="mb-2 fw-bold">ผู้อนุมัติ (ผู้บริหาร)</div><div class="mb-1 fw-bold" id="sign_manager_status" style="height:30px;"></div><div class="border-top w-75 mx-auto"></div></div></div></div></div><div class="modal-footer border-0 bg-white shadow-top py-3 d-flex justify-content-between align-items-center"><div class="flex-grow-1 me-3"><input type="text" id="approval_comment" class="form-control" placeholder="ระบุเหตุผลรวม (กรณีตีกลับทั้งใบ)..."></div><div class="d-flex gap-2"><button type="button" class="btn btn-outline-danger px-4 rounded-pill fw-bold" onclick="rejectDocument()"><i class="bi bi-x-circle me-2"></i> ตีกลับทั้งหมด</button><button type="button" class="btn btn-success px-5 rounded-pill shadow-sm fw-bold" onclick="finalizeApproval()"><i class="bi bi-check-lg me-2"></i> อนุมัติ / ส่งต่อ</button></div></div></div></div></div>
 <script src="logo.js"></script>
 <script>
     function updateTabUI(mode) { document.getElementById('btnPending').className = mode === 'pending' ? 'btn btn-sm btn-white rounded shadow-sm fw-bold px-3' : 'btn btn-sm btn-light rounded px-3 text-muted'; document.getElementById('btnHistory').className = mode === 'history' ? 'btn btn-sm btn-white rounded shadow-sm fw-bold px-3' : 'btn btn-sm btn-light rounded px-3 text-muted'; }
