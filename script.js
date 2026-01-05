@@ -35,7 +35,6 @@ const CONFIG = {
 
 // ================= 2. SYSTEM START =================
 const db = supabase.createClient(CONFIG.supaUrl, CONFIG.supaKey);
-// เช็ค EmailJS ก่อนเริ่ม
 let isEmailEnabled = false;
 if(typeof emailjs !== 'undefined') {
     emailjs.init(CONFIG.emailPublicKey);
@@ -53,8 +52,6 @@ document.addEventListener("DOMContentLoaded", function() {
     if (typeof LOGO_BASE64 !== 'undefined') {
         document.querySelectorAll('.app-logo').forEach(img => img.src = LOGO_BASE64);
     }
-    
-    // Check Admin Page
     if (window.location.href.includes('admin.html')) {
         const overlay = document.getElementById('loginOverlay');
         if (overlay) {
@@ -62,9 +59,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 overlay.style.display = 'none';
                 updateAdminUI();
                 loadData(); 
-            } else {
-                overlay.style.display = 'flex';
-            }
+            } else { overlay.style.display = 'flex'; }
         }
     }
 });
@@ -81,7 +76,7 @@ if (memoForm) {
             let publicUrl = null;
             const fileInput = document.getElementById('m_attachment');
             if (fileInput && fileInput.files.length > 0) {
-                btn.innerText = '⏳ อัปโหลดไฟล์...';
+                btn.innerText = '⏳ อัปโหลด...';
                 const file = fileInput.files[0];
                 const fileName = `memo_${Date.now()}.${file.name.split('.').pop()}`;
                 const { error: upErr } = await db.storage.from('pr-files').upload(fileName, file);
@@ -89,8 +84,7 @@ if (memoForm) {
                 const { data: urlData } = db.storage.from('pr-files').getPublicUrl(fileName);
                 publicUrl = urlData.publicUrl;
             }
-
-            btn.innerText = '⏳ บันทึกข้อมูล...';
+            btn.innerText = '⏳ บันทึก...';
             const payload = {
                 memo_no: document.getElementById('m_no').value,
                 date: document.getElementById('m_date').value,
@@ -101,12 +95,9 @@ if (memoForm) {
                 attachment_url: publicUrl,
                 status: 'pending_head'
             };
-
             const { data, error } = await db.from('memos').insert([payload]).select();
             if (error) throw error;
             const newId = data[0].id;
-
-            // พยายามส่งเมล (ถ้าพัง ให้ข้ามไป)
             try {
                 const headEmail = CONFIG.departmentHeads[payload.from_dept];
                 const adminLink = window.location.origin + '/admin.html';
@@ -117,24 +108,16 @@ if (memoForm) {
                         html_content: `<h3>เรียน ผู้อนุมัติเบื้องต้น (${payload.from_dept})</h3><p>Memo เลขที่ ${payload.memo_no} รอตรวจสอบ</p><a href="${adminLink}">คลิกเพื่อเข้าสู่ระบบ</a>` 
                     });
                 }
-            } catch (emailErr) {
-                console.warn("Email Error:", emailErr);
+            } catch(e) { console.warn('Email failed', e); }
+            if(confirm('✅ บันทึกสำเร็จ!\nต้องการเปิดหน้าพิมพ์ PDF เลยหรือไม่?')) {
+                window.open(`view_memo.html?id=${newId}`, '_blank');
             }
-            
-            // เปิดหน้า PDF ทันที
-            window.open(`view_memo.html?id=${newId}`, '_blank');
-            
-            // รอสักพักแล้วค่อยเคลียร์ฟอร์ม
-            setTimeout(() => {
-                alert('✅ บันทึก Memo เรียบร้อย!');
-                window.location.href = 'index.html'; // กลับหน้าเมนูหลัก
-            }, 1000);
-
+            window.location.reload();
         } catch (err) { console.error(err); alert('Error: ' + err.message); btn.disabled = false; btn.innerText = originalText; }
     });
 }
 
-// ================= 4. PR FORM (แก้: ส่งแล้วเปิด PDF -> กลับหน้าหลัก) =================
+// ================= 4. PR FORM =================
 window.addItemRow = function() {
     const container = document.getElementById('itemsContainer');
     if (!container) return; 
@@ -167,11 +150,10 @@ if (prForm) {
             const dept = document.getElementById('department').value;
             const headEmail = CONFIG.departmentHeads[dept];
             if (!headEmail) { alert("⚠️ ไม่พบอีเมลผู้อนุมัติของแผนกนี้"); throw new Error("Email not found"); }
-            
             let publicUrl = null;
             const fileInput = document.getElementById('attachment');
             if (fileInput.files.length > 0) {
-                btn.innerText = '⏳ อัปโหลดไฟล์...';
+                btn.innerText = '⏳ อัปโหลด...';
                 const file = fileInput.files[0];
                 const fileName = `${Date.now()}.${file.name.split('.').pop()}`;
                 const { error: upErr } = await db.storage.from('pr-files').upload(fileName, file);
@@ -179,8 +161,7 @@ if (prForm) {
                 const { data: urlData } = db.storage.from('pr-files').getPublicUrl(fileName);
                 publicUrl = urlData.publicUrl;
             }
-
-            btn.innerText = '⏳ บันทึกข้อมูล...';
+            btn.innerText = '⏳ บันทึก...';
             const items = [];
             document.querySelectorAll('.item-row').forEach(row => { 
                 items.push({
@@ -192,7 +173,6 @@ if (prForm) {
                     remark: ''
                 }); 
             });
-
             const payload = { 
                 department: dept, 
                 pr_number: document.getElementById('pr_number').value, 
@@ -204,13 +184,9 @@ if (prForm) {
                 attachment_url: publicUrl, 
                 status: 'pending_head' 
             };
-            
-            // Insert และขอ ID กลับมา
             const { data, error } = await db.from('purchase_requests').insert([payload]).select();
             if (error) throw error;
             const newId = data[0].id;
-
-            // ส่งเมล (ใส่ try-catch แยก เพื่อไม่ให้บล็อคการทำงานถ้าส่งไม่ผ่าน)
             try {
                 const adminLink = window.location.origin + '/admin.html';
                 if(isEmailEnabled) {
@@ -220,19 +196,11 @@ if (prForm) {
                         html_content: `<h3>เรียน ผู้อนุมัติเบื้องต้น (${dept})</h3><p>มีรายการขอซื้อใหม่จาก <b>${payload.requester}</b> รอการตรวจสอบ</p><p>เลขที่ PR: ${payload.pr_number}</p><p><a href="${adminLink}">คลิกเพื่อเข้าสู่ระบบอนุมัติ</a></p>` 
                     });
                 }
-            } catch (emailErr) {
-                console.error("Email sending failed but data saved:", emailErr);
+            } catch (emailErr) { console.error("Email sending failed but data saved:", emailErr); }
+            if(confirm('✅ ส่งคำขอ PR เรียบร้อย!\nคุณต้องการเปิดหน้าสำหรับ "พิมพ์/บันทึก PDF" เพื่อเก็บเป็นหลักฐานเลยหรือไม่?')) {
+                window.open(`view_pr.html?id=${newId}&mode=original`, '_blank');
             }
-
-            // เปิดหน้า PDF ใน Tab ใหม่
-            window.open(`view_pr.html?id=${newId}&mode=original`, '_blank');
-            
-            // แจ้งเตือนและกลับหน้าหลัก
-            setTimeout(() => {
-                alert(`✅ ส่งคำขอ PR เรียบร้อย!`); 
-                window.location.href = 'index.html'; // กลับหน้าเมนูหลัก ไม่เด้งกลับหน้าเดิม
-            }, 500);
-
+            window.location.href = 'index.html'; 
         } catch (err) { console.error(err); alert('Error: ' + err.message); btn.disabled = false; btn.innerText = originalText; }
     });
 }
@@ -268,48 +236,37 @@ async function loadData() {
     if (!tableBody) return;
     tableBody.innerHTML = '<tr><td colspan="5" class="text-center p-4">⏳ กำลังโหลด...</td></tr>';
     updateBadges();
-
     try {
         const tableName = currentDocType === 'pr' ? 'purchase_requests' : 'memos';
         let query = db.from(tableName).select('*').order('created_at', { ascending: false });
-
         if (currentMode === 'pending') {
             if (currentUserRole === 'head') {
                 query = query.eq('status', 'pending_head');
                 if(currentDocType === 'pr') query = query.eq('department', currentUserDept);
                 else query = query.eq('from_dept', currentUserDept);
-            } else if (currentUserRole === 'manager') {
-                query = query.eq('status', 'pending_manager');
-            }
+            } else if (currentUserRole === 'manager') { query = query.eq('status', 'pending_manager'); }
         } else {
             if (currentUserRole === 'head') {
                 query = query.neq('status', 'pending_head');
                 if(currentDocType === 'pr') query = query.eq('department', currentUserDept);
                 else query = query.eq('from_dept', currentUserDept);
-            } else {
-                query = query.in('status', ['processed', 'rejected']);
-            }
+            } else { query = query.in('status', ['processed', 'rejected']); }
         }
-
         const { data, error } = await query;
         if (error) throw error;
         allDocs = data;
         tableBody.innerHTML = '';
-        
         if (data.length === 0) { tableBody.innerHTML = `<tr><td colspan="5" class="text-center p-5 text-muted">ไม่พบรายการ</td></tr>`; return; }
-
         data.forEach(doc => {
             const date = new Date(doc.created_at || doc.date).toLocaleDateString('th-TH');
             let docNo = currentDocType === 'pr' ? doc.pr_number : doc.memo_no;
             let from = currentDocType === 'pr' ? `${doc.requester} (${doc.department})` : `${doc.from_dept} : ${doc.subject}`;
             let statusText = doc.status;
             let badgeClass = 'bg-secondary';
-
             if(statusText === 'pending_head') { statusText = 'รอหัวหน้าตรวจสอบ'; badgeClass = 'bg-warning text-dark'; }
             else if(statusText === 'pending_manager') { statusText = 'รอผู้บริหารอนุมัติ'; badgeClass = 'bg-info text-dark'; }
             else if(statusText === 'processed') { statusText = 'อนุมัติเรียบร้อย'; badgeClass = 'bg-success'; }
             else if(statusText === 'rejected') { statusText = 'ไม่อนุมัติ/ตีกลับ'; badgeClass = 'bg-danger'; }
-
             const row = `<tr><td class="ps-4"><span class="fw-bold text-primary">${docNo}</span></td><td>${date}</td><td><div class="small">${from}</div></td><td><span class="badge ${badgeClass}">${statusText}</span></td><td class="text-center pe-4"><button onclick="openDetailModal('${doc.id}')" class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-sm">ตรวจสอบ</button></td></tr>`;
             tableBody.innerHTML += row;
         });
@@ -327,9 +284,7 @@ async function updateBadges() {
             q = q.eq('status', 'pending_head');
             if(table === 'purchase_requests') q = q.eq('department', currentUserDept);
             else q = q.eq('from_dept', currentUserDept);
-        } else {
-            q = q.eq('status', 'pending_manager');
-        }
+        } else { q = q.eq('status', 'pending_manager'); }
         const { count } = await q;
         return count || 0;
     };
@@ -351,7 +306,6 @@ window.openDetailModal = function(id) {
         document.getElementById('doc_type_title').innerText = "ใบขอซื้อ (Purchase Request)";
         document.getElementById('pr_form_layout').style.display = 'block';
         document.getElementById('memo_form_layout').style.display = 'none';
-        
         document.getElementById('pr_no').innerText = currentDoc.pr_number;
         document.getElementById('pr_req_date').innerText = new Date(currentDoc.required_date).toLocaleDateString('th-TH');
         document.getElementById('pr_requester').innerText = currentDoc.requester;
@@ -368,6 +322,7 @@ window.openDetailModal = function(id) {
         }
 
         itemsToShow.forEach((item, index) => {
+            // ใช้ Index จริงจาก DB เสมอ เพื่อป้องกันการอ้างอิงผิด
             let realIndex = currentDoc.items.indexOf(item); 
             let actionHtml = '';
             let reasonHtml = '';
@@ -400,7 +355,6 @@ window.openDetailModal = function(id) {
         }
 
     } else {
-        // Memo Logic
         document.getElementById('doc_type_title').innerText = "บันทึกข้อความ (Memo)";
         document.getElementById('pr_form_layout').style.display = 'none';
         document.getElementById('memo_form_layout').style.display = 'block';
@@ -412,22 +366,18 @@ window.openDetailModal = function(id) {
         document.getElementById('memo_content').innerText = currentDoc.content;
         document.getElementById('sign_requester_name').innerText = "เจ้าหน้าที่แผนก" + currentDoc.from_dept;
     }
-
     const attArea = document.getElementById('attachment_area');
     if (currentDoc.attachment_url) {
         attArea.style.display = 'block';
         document.getElementById('attachment_link').href = currentDoc.attachment_url;
     } else { attArea.style.display = 'none'; }
-
     const footerButtons = document.querySelector('.modal-footer');
     if (currentMode === 'history') footerButtons.style.display = 'none';
     else footerButtons.style.display = 'flex';
-
     const signHead = document.getElementById('sign_head_status');
     const signManager = document.getElementById('sign_manager_status');
     if(signHead) signHead.innerHTML = (currentDoc.status !== 'pending_head') ? '<span class="text-success">อนุมัติแล้ว</span>' : '<span class="text-muted">...</span>';
     if(signManager) signManager.innerHTML = (currentDoc.status === 'processed') ? '<span class="text-success">อนุมัติแล้ว</span>' : '<span class="text-muted">...</span>';
-
     new bootstrap.Modal(document.getElementById('detailModal')).show();
 }
 
@@ -442,7 +392,7 @@ window.toggleReason = function(index) {
     }
 }
 
-// [Logic ปุ่มเขียว: บันทึก (แก้: บันทึกก่อนส่งเมล เพื่อป้องกันปุ่มค้าง)]
+// [Logic แก้ไข: ใช้การวนลูป Data แทน UI เพื่อความแม่นยำ 100%]
 window.finalizeApproval = async function() {
     const btn = document.querySelector('.btn-success');
     btn.disabled = true; btn.innerText = '⏳ กำลังบันทึก...';
@@ -456,21 +406,30 @@ window.finalizeApproval = async function() {
         const now = new Date().toISOString();
 
         if (currentDocType === 'pr') {
-            const checkboxes = document.querySelectorAll('.item-check');
             let hasRejectionWithoutReason = false;
-            checkboxes.forEach(cb => {
-                const idx = cb.getAttribute('data-index');
-                const isApproved = cb.checked;
-                const reasonInput = document.getElementById(`reason-${idx}`)?.value || ''; // ใส่ ? เพื่อกัน Error
-                if (!isApproved && !reasonInput.trim()) hasRejectionWithoutReason = true;
+            
+            // ใช้ forEach วนลูปจาก Data โดยตรง (ไม่ใช่ querySelectorAll)
+            currentDoc.items.forEach((item, index) => {
+                // พยายามหา UI Component ที่ตรงกับ Index
+                const cb = document.querySelector(`.item-check[data-index="${index}"]`);
+                const reasonInput = document.getElementById(`reason-${index}`);
+                
+                // ถ้าหาไม่เจอ (เช่น กรณี Modal Render ไม่ครบ) ให้ยึดค่าเดิม หรือ Default Approved
+                // แต่ปกติถ้าเปิด Modal มาแล้ว HTML ต้องมีครบ
+                if (cb) {
+                    const isApproved = cb.checked;
+                    const reason = reasonInput ? reasonInput.value : '';
+                    
+                    if (!isApproved && !reason.trim()) hasRejectionWithoutReason = true;
 
-                const roleName = currentUserRole === 'head' ? 'หัวหน้าแผนก' : 'ผู้บริหาร';
-                if (!isApproved) {
-                    currentDoc.items[idx].status = 'rejected';
-                    currentDoc.items[idx].remark = `${reasonInput} (โดย: ${roleName})`;
-                } else {
-                    currentDoc.items[idx].status = 'approved';
-                    currentDoc.items[idx].remark = '';
+                    const roleName = currentUserRole === 'head' ? 'หัวหน้าแผนก' : 'ผู้บริหาร';
+                    if (!isApproved) {
+                        item.status = 'rejected';
+                        item.remark = `${reason} (โดย: ${roleName})`;
+                    } else {
+                        item.status = 'approved';
+                        item.remark = '';
+                    }
                 }
             });
 
@@ -482,8 +441,6 @@ window.finalizeApproval = async function() {
         }
 
         const updatePayload = { status: '' };
-
-        // กำหนด Status ถัดไป
         if (currentUserRole === 'head') {
             nextStatus = 'pending_manager';
             updatePayload.status = nextStatus;
@@ -498,22 +455,18 @@ window.finalizeApproval = async function() {
             updatePayload.manager_approved_at = now; 
             emailTo = CONFIG.purchasingEmail;
             emailSubject = `[Approved] คำสั่งซื้อ PR ${currentDoc.pr_number} อนุมัติแล้ว`;
-            
             const linkApproved = window.location.origin + `/view_pr.html?id=${currentDoc.id}&mode=approved`;
             const linkOriginal = window.location.origin + `/view_pr.html?id=${currentDoc.id}&mode=original`;
-            emailContent = `
-                <h3>เรียน ฝ่ายจัดซื้อ</h3><p>PR เลขที่ <b>${currentDoc.pr_number}</b> อนุมัติเรียบร้อยแล้ว</p>
-                <hr><p>1. <a href="${linkApproved}">📂 ไฟล์ PO</a></p><p>2. <a href="${linkOriginal}">📄 ไฟล์ Log ต้นฉบับ</a></p>
-            `;
+            emailContent = `<h3>เรียน ฝ่ายจัดซื้อ</h3><p>PR เลขที่ <b>${currentDoc.pr_number}</b> อนุมัติเรียบร้อยแล้ว</p><hr><p>1. <a href="${linkApproved}">📂 ไฟล์ PO</a></p><p>2. <a href="${linkOriginal}">📄 ไฟล์ Log ต้นฉบับ</a></p>`;
         }
 
         if (currentDocType === 'pr') updatePayload.items = currentDoc.items;
-        
-        // --- 1. บันทึกลง DB ก่อน (สำคัญสุด) ---
+
+        // บันทึก DB
         const { error } = await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
         if (error) throw error;
 
-        // --- 2. ส่งเมลทีหลัง (ใส่ try-catch ไม่ให้พังถ้าเน็ตหลุด) ---
+        // ส่งเมล (Safe Mode)
         try {
             if (emailTo && isEmailEnabled) {
                 btn.innerText = '⏳ กำลังส่งเมล...';
@@ -521,10 +474,7 @@ window.finalizeApproval = async function() {
                     to_email: emailTo, subject: emailSubject, html_content: emailContent 
                 });
             }
-        } catch (emailErr) {
-            console.warn("Email Failed (But Saved):", emailErr);
-            alert("บันทึกสำเร็จ (แต่ส่งอีเมลแจ้งเตือนไม่ผ่าน กรุณาแจ้งผู้เกี่ยวข้องทางอื่น)");
-        }
+        } catch (emailErr) { console.warn("Email Failed:", emailErr); }
 
         alert('✅ บันทึกผลอนุมัติเรียบร้อย!');
         bootstrap.Modal.getInstance(document.getElementById('detailModal')).hide();
@@ -547,14 +497,13 @@ window.rejectDocument = async function() {
             updatePayload.items = currentDoc.items;
         }
         await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
-        
         alert('❌ ตีกลับเอกสารเรียบร้อย');
         bootstrap.Modal.getInstance(document.getElementById('detailModal')).hide();
         loadData();
     } catch(err) { console.error(err); alert('Error: ' + err.message); } finally { if(btn) { btn.disabled = false; btn.innerText = 'ตีกลับเอกสาร'; } }
 }
 
-// ================= 7. VIEW / PRINT LOADERS (Auto Pagination) =================
+// ================= 7. VIEW / PRINT LOADERS (แก้ไข: เพิ่มจำนวนต่อหน้าเป็น 15) =================
 const formatDate = (isoStr) => {
     if(!isoStr) return "";
     const d = new Date(isoStr);
@@ -573,7 +522,8 @@ async function loadPRForPrint() {
         let displayItems = pr.items;
         if (mode === 'approved') displayItems = pr.items.filter(item => item.status === 'approved');
 
-        const ITEMS_PER_PAGE = 12; 
+        // ==== ปรับจำนวนรายการต่อหน้าเป็น 15 ====
+        const ITEMS_PER_PAGE = 15; 
         const totalItems = displayItems.length;
         const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
         const container = document.getElementById('pages-container');
@@ -612,9 +562,7 @@ async function loadPRForPrint() {
             for(let k=0; k<emptyRows; k++) tbody.innerHTML += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>`;
 
             const footer = pageDiv.querySelector('.footer-section');
-            if (i < totalPages - 1) {
-                footer.style.display = 'none'; 
-            } else {
+            if (i < totalPages - 1) { footer.style.display = 'none'; } else {
                 pageDiv.querySelector('.v_remark').innerText = pr.header_remark || '-';
                 pageDiv.querySelector('.v_sign_requester').innerText = pr.requester;
                 pageDiv.querySelector('.v_sign_date_req').innerText = "วันที่ " + new Date(pr.created_at).toLocaleDateString('th-TH');
