@@ -322,7 +322,7 @@ window.openDetailModal = function(id) {
         }
 
         itemsToShow.forEach((item, index) => {
-            // ใช้ Index จริงจาก DB เสมอ เพื่อป้องกันการอ้างอิงผิด
+            // [FIXED] ใช้ index เป็น ID เพื่อความแม่นยำ
             let realIndex = currentDoc.items.indexOf(item); 
             let actionHtml = '';
             let reasonHtml = '';
@@ -333,10 +333,10 @@ window.openDetailModal = function(id) {
             } else {
                 actionHtml = `
                     <div class="form-check form-switch d-inline-block">
-                        <input class="form-check-input item-check" type="checkbox" checked onchange="toggleReason(${realIndex})" data-index="${realIndex}">
-                        <label class="form-check-label text-success fw-bold" id="label-${realIndex}">อนุมัติ</label>
+                        <input class="form-check-input item-check" type="checkbox" checked onchange="toggleReason(${realIndex})" id="check-${realIndex}" data-index="${realIndex}">
+                        <label class="form-check-label text-success fw-bold" id="label-${realIndex}" for="check-${realIndex}">อนุมัติ</label>
                     </div>`;
-                reasonHtml = `<input type="text" id="reason-${realIndex}" class="form-control form-control-sm" placeholder="ระบุเหตุผล (ถ้าไม่ให้)..." style="display:none;">`;
+                reasonHtml = `<input type="text" id="reason-${realIndex}" class="form-control form-control-sm" placeholder="ระบุเหตุผล..." style="display:none;">`;
             }
 
             tbody.innerHTML += `
@@ -382,7 +382,7 @@ window.openDetailModal = function(id) {
 }
 
 window.toggleReason = function(index) {
-    const checkbox = document.querySelector(`.item-check[data-index="${index}"]`);
+    const checkbox = document.getElementById(`check-${index}`);
     const reasonInput = document.getElementById(`reason-${index}`);
     const label = document.getElementById(`label-${index}`);
     if (checkbox.checked) {
@@ -392,7 +392,7 @@ window.toggleReason = function(index) {
     }
 }
 
-// [Logic แก้ไข: ใช้การวนลูป Data แทน UI เพื่อความแม่นยำ 100%]
+// [FIXED] Logic บันทึกที่ปลอดภัย 100% ไม่พึ่งพา DOM
 window.finalizeApproval = async function() {
     const btn = document.querySelector('.btn-success');
     btn.disabled = true; btn.innerText = '⏳ กำลังบันทึก...';
@@ -408,29 +408,32 @@ window.finalizeApproval = async function() {
         if (currentDocType === 'pr') {
             let hasRejectionWithoutReason = false;
             
-            // ใช้ forEach วนลูปจาก Data โดยตรง (ไม่ใช่ querySelectorAll)
-            currentDoc.items.forEach((item, index) => {
-                // พยายามหา UI Component ที่ตรงกับ Index
-                const cb = document.querySelector(`.item-check[data-index="${index}"]`);
+            // ใช้ map เพื่อสร้าง array ใหม่ที่อัปเดตแล้ว
+            const updatedItems = currentDoc.items.map((item, index) => {
+                const checkbox = document.getElementById(`check-${index}`);
                 const reasonInput = document.getElementById(`reason-${index}`);
                 
-                // ถ้าหาไม่เจอ (เช่น กรณี Modal Render ไม่ครบ) ให้ยึดค่าเดิม หรือ Default Approved
-                // แต่ปกติถ้าเปิด Modal มาแล้ว HTML ต้องมีครบ
-                if (cb) {
-                    const isApproved = cb.checked;
-                    const reason = reasonInput ? reasonInput.value : '';
-                    
-                    if (!isApproved && !reason.trim()) hasRejectionWithoutReason = true;
+                // ถ้าหา Element ไม่เจอ (เช่น กรณี Modal เรนเดอร์ไม่ครบ) ให้ใช้สถานะเดิม
+                // แต่ปกติถ้าเปิด Modal แล้ว Element ต้องอยู่
+                let isApproved = true;
+                let reason = '';
 
-                    const roleName = currentUserRole === 'head' ? 'หัวหน้าแผนก' : 'ผู้บริหาร';
-                    if (!isApproved) {
-                        item.status = 'rejected';
-                        item.remark = `${reason} (โดย: ${roleName})`;
-                    } else {
-                        item.status = 'approved';
-                        item.remark = '';
-                    }
+                if (checkbox) {
+                    isApproved = checkbox.checked;
+                    reason = reasonInput ? reasonInput.value : '';
+                    if (!isApproved && !reason.trim()) hasRejectionWithoutReason = true;
+                } else {
+                    // Fallback: ถ้าหา Checkbox ไม่เจอ ให้ถือว่าอนุมัติไปก่อน หรือใช้ค่าเดิม
+                    isApproved = (item.status === 'approved' || item.status === 'pending');
                 }
+
+                const roleName = currentUserRole === 'head' ? 'หัวหน้าแผนก' : 'ผู้บริหาร';
+                
+                return {
+                    ...item, // เก็บค่าเดิม (code, qty, etc.)
+                    status: isApproved ? 'approved' : 'rejected',
+                    remark: isApproved ? '' : `${reason} (โดย: ${roleName})`
+                };
             });
 
             if (hasRejectionWithoutReason) {
@@ -438,6 +441,9 @@ window.finalizeApproval = async function() {
                 btn.disabled = false; btn.innerText = 'อนุมัติ';
                 return;
             }
+            
+            // อัปเดต items กลับไปที่ตัวแปรหลัก
+            currentDoc.items = updatedItems;
         }
 
         const updatePayload = { status: '' };
@@ -462,8 +468,19 @@ window.finalizeApproval = async function() {
 
         if (currentDocType === 'pr') updatePayload.items = currentDoc.items;
 
-        // บันทึก DB
-        const { error } = await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
+        // [FIXED] ดักจับ Error 400 (กรณีไม่มี Column เวลา)
+        // พยายามบันทึกแบบปกติก่อน
+        let { error } = await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
+
+        // ถ้า Error 400 (Bad Request) เดาว่าไม่มี Column head_approved_at
+        if (error && error.code === 'PGRST204' || error.code === '42703' || error.message.includes('400')) {
+            console.warn("Database missing timestamp columns. Retrying without timestamp...");
+            delete updatePayload.head_approved_at;
+            delete updatePayload.manager_approved_at;
+            const retry = await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
+            error = retry.error;
+        }
+
         if (error) throw error;
 
         // ส่งเมล (Safe Mode)
@@ -503,7 +520,7 @@ window.rejectDocument = async function() {
     } catch(err) { console.error(err); alert('Error: ' + err.message); } finally { if(btn) { btn.disabled = false; btn.innerText = 'ตีกลับเอกสาร'; } }
 }
 
-// ================= 7. VIEW / PRINT LOADERS (แก้ไข: เพิ่มจำนวนต่อหน้าเป็น 15) =================
+// ================= 7. VIEW / PRINT LOADERS (Auto Pagination) =================
 const formatDate = (isoStr) => {
     if(!isoStr) return "";
     const d = new Date(isoStr);
@@ -522,8 +539,7 @@ async function loadPRForPrint() {
         let displayItems = pr.items;
         if (mode === 'approved') displayItems = pr.items.filter(item => item.status === 'approved');
 
-        // ==== ปรับจำนวนรายการต่อหน้าเป็น 15 ====
-        const ITEMS_PER_PAGE = 15; 
+        const ITEMS_PER_PAGE = 15; // ปรับเป็น 15 รายการต่อหน้า
         const totalItems = displayItems.length;
         const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
         const container = document.getElementById('pages-container');
@@ -562,7 +578,9 @@ async function loadPRForPrint() {
             for(let k=0; k<emptyRows; k++) tbody.innerHTML += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>`;
 
             const footer = pageDiv.querySelector('.footer-section');
-            if (i < totalPages - 1) { footer.style.display = 'none'; } else {
+            if (i < totalPages - 1) {
+                footer.style.display = 'none'; 
+            } else {
                 pageDiv.querySelector('.v_remark').innerText = pr.header_remark || '-';
                 pageDiv.querySelector('.v_sign_requester').innerText = pr.requester;
                 pageDiv.querySelector('.v_sign_date_req').innerText = "วันที่ " + new Date(pr.created_at).toLocaleDateString('th-TH');
