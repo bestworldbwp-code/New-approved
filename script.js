@@ -392,7 +392,7 @@ window.toggleReason = function(index) {
     }
 }
 
-// [FIXED] Logic บันทึกที่ปลอดภัย 100% ไม่พึ่งพา DOM
+// [FIXED] แก้ Logic เช็ค Error ที่ถูกต้อง
 window.finalizeApproval = async function() {
     const btn = document.querySelector('.btn-success');
     btn.disabled = true; btn.innerText = '⏳ กำลังบันทึก...';
@@ -413,8 +413,6 @@ window.finalizeApproval = async function() {
                 const checkbox = document.getElementById(`check-${index}`);
                 const reasonInput = document.getElementById(`reason-${index}`);
                 
-                // ถ้าหา Element ไม่เจอ (เช่น กรณี Modal เรนเดอร์ไม่ครบ) ให้ใช้สถานะเดิม
-                // แต่ปกติถ้าเปิด Modal แล้ว Element ต้องอยู่
                 let isApproved = true;
                 let reason = '';
 
@@ -423,7 +421,6 @@ window.finalizeApproval = async function() {
                     reason = reasonInput ? reasonInput.value : '';
                     if (!isApproved && !reason.trim()) hasRejectionWithoutReason = true;
                 } else {
-                    // Fallback: ถ้าหา Checkbox ไม่เจอ ให้ถือว่าอนุมัติไปก่อน หรือใช้ค่าเดิม
                     isApproved = (item.status === 'approved' || item.status === 'pending');
                 }
 
@@ -468,20 +465,21 @@ window.finalizeApproval = async function() {
 
         if (currentDocType === 'pr') updatePayload.items = currentDoc.items;
 
-        // [FIXED] ดักจับ Error 400 (กรณีไม่มี Column เวลา)
-        // พยายามบันทึกแบบปกติก่อน
+        // [FIXED] ดักจับ Error ที่ถูกต้อง
         let { error } = await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
 
-        // ถ้า Error 400 (Bad Request) เดาว่าไม่มี Column head_approved_at
-        if (error && error.code === 'PGRST204' || error.code === '42703' || error.message.includes('400')) {
-            console.warn("Database missing timestamp columns. Retrying without timestamp...");
-            delete updatePayload.head_approved_at;
-            delete updatePayload.manager_approved_at;
-            const retry = await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
-            error = retry.error;
+        if (error) {
+            // ถ้า Error 400 (Bad Request) แสดงว่าคอลัมน์เวลาไม่มี -> ให้ลองบันทึกแบบไม่ใส่เวลา
+            if (error.code === 'PGRST204' || error.code === '42703' || (error.message && error.message.includes('400'))) {
+                console.warn("Database missing timestamp columns. Retrying without timestamp...");
+                delete updatePayload.head_approved_at;
+                delete updatePayload.manager_approved_at;
+                const retry = await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
+                error = retry.error;
+            }
         }
 
-        if (error) throw error;
+        if (error) throw error; // ถ้ายัง Error อยู่ ให้โยนออกไปที่ Catch
 
         // ส่งเมล (Safe Mode)
         try {
@@ -539,7 +537,7 @@ async function loadPRForPrint() {
         let displayItems = pr.items;
         if (mode === 'approved') displayItems = pr.items.filter(item => item.status === 'approved');
 
-        const ITEMS_PER_PAGE = 15; // ปรับเป็น 15 รายการต่อหน้า
+        const ITEMS_PER_PAGE = 15; 
         const totalItems = displayItems.length;
         const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
         const container = document.getElementById('pages-container');
