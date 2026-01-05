@@ -64,7 +64,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 
-// ================= 3. MEMO FORM =================
+// ================= 3. MEMO FORM (แก้ไข: ให้พิมพ์ PDF หลังส่ง) =================
 const memoForm = document.getElementById('memoForm');
 if (memoForm) {
     memoForm.addEventListener('submit', async (e) => {
@@ -97,9 +97,12 @@ if (memoForm) {
                 status: 'pending_head'
             };
 
-            const { error } = await db.from('memos').insert([payload]);
+            // [จุดแก้] ใช้ .select() เพื่อเอา ID ที่เพิ่งสร้างกลับมา
+            const { data, error } = await db.from('memos').insert([payload]).select();
             if (error) throw error;
+            const newId = data[0].id; // ได้ ID เอกสารใหม่
 
+            // ส่งเมลหาผู้อนุมัติ (ยังคงไว้ เพื่อให้ process เดิน)
             const headEmail = CONFIG.departmentHeads[payload.from_dept];
             const adminLink = window.location.origin + '/admin.html';
             if (headEmail) {
@@ -109,14 +112,18 @@ if (memoForm) {
                     html_content: `<h3>เรียน ผู้อนุมัติเบื้องต้น (${payload.from_dept})</h3><p>Memo เลขที่ ${payload.memo_no} รอตรวจสอบ</p><a href="${adminLink}">คลิกเพื่อเข้าสู่ระบบ</a>` 
                 });
             }
-            alert('✅ ส่ง Memo เรียบร้อย!');
+            
+            // [จุดแก้] ถามผู้ใช้ว่าจะพิมพ์เลยไหม
+            if(confirm('✅ บันทึก Memo เรียบร้อย!\nคุณต้องการเปิดหน้าสำหรับ "พิมพ์/บันทึก PDF" เลยหรือไม่?')) {
+                window.open(`view_memo.html?id=${newId}`, '_blank');
+            }
             window.location.reload();
 
         } catch (err) { console.error(err); alert('Error: ' + err.message); } finally { btn.disabled = false; btn.innerText = originalText; }
     });
 }
 
-// ================= 4. PR FORM =================
+// ================= 4. PR FORM (แก้ไข: ให้พิมพ์ PDF หลังส่ง) =================
 window.addItemRow = function() {
     const container = document.getElementById('itemsContainer');
     if (!container) return; 
@@ -187,9 +194,12 @@ if (prForm) {
                 status: 'pending_head' 
             };
             
-            const { error } = await db.from('purchase_requests').insert([payload]);
+            // [จุดแก้] ใช้ .select() เพื่อเอา ID
+            const { data, error } = await db.from('purchase_requests').insert([payload]).select();
             if (error) throw error;
+            const newId = data[0].id;
 
+            // ส่งเมลหาผู้อนุมัติ (คงไว้)
             const adminLink = window.location.origin + '/admin.html';
             await emailjs.send(CONFIG.emailServiceId, CONFIG.emailTemplateId_Master, { 
                 to_email: headEmail, 
@@ -197,7 +207,10 @@ if (prForm) {
                 html_content: `<h3>เรียน ผู้อนุมัติเบื้องต้น (${dept})</h3><p>มีรายการขอซื้อใหม่จาก <b>${payload.requester}</b> รอการตรวจสอบ</p><p>เลขที่ PR: ${payload.pr_number}</p><p><a href="${adminLink}">คลิกเพื่อเข้าสู่ระบบอนุมัติ</a></p>` 
             });
 
-            alert(`✅ ส่งเรื่องถึงผู้อนุมัติเบื้องต้น (${dept}) เรียบร้อยแล้ว!`); 
+            // [จุดแก้] ถามผู้ใช้ว่าจะพิมพ์เลยไหม
+            if(confirm('✅ ส่งคำขอ PR เรียบร้อย!\nคุณต้องการเปิดหน้าสำหรับ "พิมพ์/บันทึก PDF" เพื่อเก็บเป็นหลักฐานเลยหรือไม่?')) {
+                window.open(`view_pr.html?id=${newId}&mode=original`, '_blank');
+            }
             window.location.reload();
 
         } catch (err) { console.error(err); alert('Error: ' + err.message); } finally { btn.disabled = false; btn.innerText = originalText; }
@@ -408,7 +421,7 @@ window.toggleReason = function(index) {
     }
 }
 
-// [Logic ปุ่มเขียว: บันทึก (รวมเวลา) + แจ้งเตือน]
+// [Logic ปุ่มเขียว: บันทึก (รวมเวลา) + ตัดเมลแจ้งกลับ Requester]
 window.finalizeApproval = async function() {
     const btn = document.querySelector('.btn-success');
     btn.disabled = true; btn.innerText = '⏳ กำลังประมวลผล...';
@@ -420,10 +433,8 @@ window.finalizeApproval = async function() {
         let emailTo = '';
         let emailContent = '';
         
-        // เวลาปัจจุบันสำหรับประทับตรา
         const now = new Date().toISOString();
 
-        // --- Update รายสินค้า ---
         if (currentDocType === 'pr') {
             const checkboxes = document.querySelectorAll('.item-check');
             let hasRejectionWithoutReason = false;
@@ -452,11 +463,10 @@ window.finalizeApproval = async function() {
 
         const updatePayload = { status: nextStatus };
 
-        // --- Logic การบันทึกเวลา + สถานะ ---
         if (currentUserRole === 'head') {
             nextStatus = 'pending_manager';
             updatePayload.status = nextStatus;
-            updatePayload.head_approved_at = now; // บันทึกเวลา Head
+            updatePayload.head_approved_at = now; 
 
             emailTo = CONFIG.managerEmail;
             emailSubject = `[อนุมัติขั้นที่ 1] PR ${currentDoc.pr_number} ผ่านการตรวจสอบแล้ว`;
@@ -465,7 +475,7 @@ window.finalizeApproval = async function() {
         } else if (currentUserRole === 'manager') {
             nextStatus = 'processed';
             updatePayload.status = nextStatus;
-            updatePayload.manager_approved_at = now; // บันทึกเวลา Manager
+            updatePayload.manager_approved_at = now; 
             
             emailTo = CONFIG.purchasingEmail;
             emailSubject = `[Approved] คำสั่งซื้อ PR ${currentDoc.pr_number} อนุมัติแล้ว`;
@@ -481,13 +491,8 @@ window.finalizeApproval = async function() {
                 <p>2. <a href="${linkOriginal}" style="font-weight:bold; color:gray;">📄 ต้นฉบับทั้งหมด (Log)</a></p>
             `;
 
-            if (currentDoc.email) {
-                await emailjs.send(CONFIG.emailServiceId, CONFIG.emailTemplateId_Master, { 
-                    to_email: currentDoc.email, 
-                    subject: `[Approved] อนุมัติแล้ว: ${currentDoc.pr_number || currentDoc.memo_no}`, 
-                    html_content: `<h3>เรียน คุณ${currentDoc.requester || 'ผู้ขอ'}</h3><p>รายการ <b>${currentDoc.pr_number || currentDoc.memo_no}</b> ได้รับการอนุมัติแล้ว</p>` 
-                });
-            }
+            // [จุดแก้] ตัดการส่งเมลกลับหา Requester เพื่อประหยัดโควตา
+            // if (currentDoc.email) { ... }  <-- ลบออก
         }
 
         if (currentDocType === 'pr') updatePayload.items = currentDoc.items;
@@ -495,6 +500,7 @@ window.finalizeApproval = async function() {
         const { error } = await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
         if (error) throw error;
 
+        // ยังส่งเมลหา Manager/Purchasing ตามปกติ เพื่อให้งานเดิน
         if (emailTo) {
             await emailjs.send(CONFIG.emailServiceId, CONFIG.emailTemplateId_Master, { 
                 to_email: emailTo, subject: emailSubject, html_content: emailContent 
@@ -522,19 +528,17 @@ window.rejectDocument = async function() {
             updatePayload.items = currentDoc.items;
         }
         await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
-        if (currentDoc.email) {
-            await emailjs.send(CONFIG.emailServiceId, CONFIG.emailTemplateId_Master, { 
-                to_email: currentDoc.email, subject: `[Rejected] รายการถูกตีกลับ`, html_content: `<h3 style="color:red;">รายการนี้ถูกตีกลับ</h3><p><b>เหตุผล:</b> ${comment}</p>` 
-            });
-        }
+        
+        // [จุดแก้] ตัดการส่งเมลแจ้งตีกลับ (ผู้ขอต้องมาเช็คเอง)
+        // if (currentDoc.email) { ... } <-- ลบออก
+
         alert('❌ ตีกลับเอกสารเรียบร้อย');
         bootstrap.Modal.getInstance(document.getElementById('detailModal')).hide();
         loadData();
     } catch(err) { console.error(err); alert('Error: ' + err.message); } finally { if(btn) { btn.disabled = false; btn.innerText = 'ตีกลับเอกสาร'; } }
 }
 
-// ================= 7. VIEW / PRINT LOADERS (เพิ่มการแสดงเวลา) =================
-// Helper Formatter
+// ================= 7. VIEW / PRINT LOADERS =================
 const formatDate = (isoStr) => {
     if(!isoStr) return "";
     const d = new Date(isoStr);
@@ -578,7 +582,6 @@ async function loadPRForPrint() {
             tbody.innerHTML += `<tr style="${rowStyle}"><td class="text-center">${index + 1}</td><td>${item.code || '-'}</td><td>${item.description}</td><td class="text-center">${item.quantity}</td><td class="text-center">${item.unit}</td><td class="text-center">${statusBadge}</td></tr>`;
         });
 
-        // Signatures & Dates
         document.getElementById('v_sign_requester').innerText = pr.requester;
         document.getElementById('v_sign_date_req').innerText = "วันที่ " + new Date(pr.created_at).toLocaleDateString('th-TH');
 
@@ -595,8 +598,6 @@ async function loadPRForPrint() {
 }
 
 async function loadMemoForPrint() {
-    // (Memo Function ยังคงเดิม)
-    // ... Copy ส่วน Memo เดิมมาใส่ หรือใช้ Logic เดียวกันถ้าต้องการโชว์เวลาใน Memo ด้วย ...
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
     if (!id) return;
