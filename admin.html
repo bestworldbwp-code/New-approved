@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Admin Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <style>
+        :root { --primary-color: #4361ee; --secondary-color: #3f37c9; --success-color: #4cc9f0; --bg-color: #f8f9fa; --card-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+        body { background-color: var(--bg-color); font-family: 'Sarabun', sans-serif; color: #333; } 
+        #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.98); z-index: 9999; display: flex; justify-content: center; align-items: center; flex-direction: column; backdrop-filter: blur(5px); }
+        .navbar-custom { background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 15px 0; }
+        .stat-card { border: none; border-radius: 15px; box-shadow: var(--card-shadow); transition: transform 0.2s; cursor: pointer; overflow: hidden; position: relative; }
+        .stat-card:hover { transform: translateY(-5px); }
+        .stat-icon { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; color: white; }
+        .main-card { border: none; border-radius: 15px; box-shadow: var(--card-shadow); overflow: hidden; }
+        .table thead th { background-color: #f1f3f9; color: #555; font-weight: 600; border-bottom: none; padding: 15px; }
+        .table tbody td { padding: 15px; vertical-align: middle; border-bottom: 1px solid #f0f0f0; }
+        .table-hover tbody tr:hover { background-color: #fcfcfc; }
+        .paper-preview { background: white; padding: 40px; border: 1px solid #e0e0e0; box-shadow: 0 0 20px rgba(0,0,0,0.05); min-height: 600px; position: relative; }
+        .doc-header { border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 25px; }
+        .field-value { border-bottom: 1px dotted #999; padding: 0 10px; color: #0d6efd; font-weight: 600; }
+    </style>
+</head>
+<body>
+<div id="loginOverlay">
+    <div class="card border-0 shadow-lg p-5 text-center" style="max-width: 400px; width: 90%; border-radius: 20px;">
+        <img src="" class="app-logo mb-4 mx-auto" alt="Logo" style="height: 80px;">
+        <h4 class="mb-2 fw-bold text-dark">เข้าสู่ระบบอนุมัติ</h4>
+        <div class="form-floating mb-3"><input type="password" id="adminPassInput" class="form-control rounded-pill text-center" placeholder="Password" inputmode="numeric"><label for="adminPassInput" class="text-center w-100">รหัสผ่าน (Password)</label></div>
+        <button onclick="checkAdminPassword()" class="btn btn-primary w-100 btn-lg rounded-pill shadow-sm mb-3">เข้าสู่ระบบ</button>
+        <a href="index.html" class="text-decoration-none text-muted small"><i class="bi bi-arrow-left"></i> กลับหน้าหลัก</a>
+    </div>
+</div>
+<nav class="navbar navbar-custom fixed-top">
+    <div class="container-fluid px-4">
+        <div class="d-flex align-items-center"><img src="" class="app-logo me-3" alt="Logo" style="height: 40px;"><div><h6 class="mb-0 fw-bold text-dark">Admin Dashboard</h6><small class="text-muted" id="pageTitle">กำลังโหลดข้อมูล...</small></div></div>
+        <div class="d-flex gap-2"><button onclick="loadData()" class="btn btn-light rounded-circle shadow-sm" title="รีเฟรชข้อมูล"><i class="bi bi-arrow-clockwise text-primary"></i></button><a href="index.html" class="btn btn-light rounded-circle shadow-sm" title="ออกสู่หน้าหลัก"><i class="bi bi-box-arrow-right text-danger"></i></a></div>
+    </div>
+</nav>
+<div class="container-fluid px-4" style="margin-top: 100px; padding-bottom: 50px;">
+    <div class="row g-4 mb-4">
+        <div class="col-md-3 col-sm-6"><div class="card stat-card h-100" onclick="switchDocType('pr')"><div class="card-body d-flex align-items-center p-4"><div class="stat-icon bg-primary shadow-sm me-3"><i class="bi bi-cart-fill"></i></div><div><h6 class="text-muted mb-1">ใบขอซื้อ (PR)</h6><h4 class="fw-bold m-0" id="countDisplayPR">-</h4><span id="badgePR" class="position-absolute top-0 end-0 m-3 badge rounded-pill bg-danger" style="display:none">0</span></div></div></div></div>
+        <div class="col-md-3 col-sm-6"><div class="card stat-card h-100" onclick="switchDocType('memo')"><div class="card-body d-flex align-items-center p-4"><div class="stat-icon bg-success shadow-sm me-3"><i class="bi bi-file-text-fill"></i></div><div><h6 class="text-muted mb-1">บันทึกข้อความ (Memo)</h6><h4 class="fw-bold m-0" id="countDisplayMemo">-</h4><span id="badgeMemo" class="position-absolute top-0 end-0 m-3 badge rounded-pill bg-danger" style="display:none">0</span></div></div></div></div>
+    </div>
+    <div class="card main-card">
+        <div class="card-header bg-white py-3 px-4 border-0 d-flex justify-content-between align-items-center">
+            <h5 class="fw-bold m-0 text-primary"><i class="bi bi-list-task me-2"></i> รายการเอกสาร <span class="badge bg-light text-dark ms-2 border" id="currentViewLabel">PR</span></h5>
+            <div class="btn-group bg-light rounded p-1" role="group"><button type="button" onclick="switchTab('pending')" class="btn btn-sm btn-white rounded shadow-sm fw-bold px-3" id="btnPending">⏳ รออนุมัติ</button><button type="button" onclick="switchTab('history')" class="btn btn-sm btn-light rounded px-3 text-muted" id="btnHistory">📜 ประวัติ</button></div>
+        </div>
+        <div class="card-body p-0"><div class="table-responsive"><table class="table table-hover mb-0 text-nowrap align-middle"><thead><tr><th width="15%" class="ps-4">เลขที่เอกสาร</th><th width="15%">วันที่</th><th width="30%">รายละเอียด (จาก / เรื่อง)</th><th width="20%">สถานะปัจจุบัน</th><th width="20%" class="text-center pe-4">จัดการ</th></tr></thead><tbody id="dataTableBody"></tbody></table></div></div>
+    </div>
+</div>
+<div class="modal fade" id="detailModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content border-0" style="background-color: #f3f4f6;">
+            <div class="modal-header border-0 pb-0"><h5 class="modal-title fw-bold text-dark ms-2"><i class="bi bi-eye-fill me-2"></i> ตรวจสอบเอกสาร</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="paper-preview mx-auto rounded shadow-sm" style="max-width: 210mm;">
+                    <div class="text-center mb-4 doc-header"><img src="" class="app-logo mb-2" style="height: 60px;"><h4 class="fw-bold m-0 text-dark">บริษัท เบสท์เวิลด์ อินเตอร์พลาส จำกัด</h4><div id="doc_type_title" class="fw-bold mt-2 fs-5 text-secondary"></div></div>
+                    
+                    <div id="pr_form_layout" style="display:none;">
+                        <div class="row g-3 mb-4"><div class="col-6">เลขที่: <span id="pr_no" class="field-value"></span></div><div class="col-6">วันที่ต้องการ: <span id="pr_req_date" class="field-value text-danger"></span></div><div class="col-6">ผู้ขอซื้อ: <span id="pr_requester" class="field-value"></span></div><div class="col-6">แผนก: <span id="pr_dept" class="field-value"></span></div></div>
+                        <div class="table-responsive rounded border"><table class="table table-sm mb-0 table-striped"><thead class="table-light"><tr class="text-center"><th>รหัส</th><th>รายการ</th><th>จำนวน</th><th>หน่วย</th><th width="20%">ผลการพิจารณา</th><th width="25%">เหตุผล (ถ้าไม่อนุมัติ)</th></tr></thead><tbody id="pr_items_body"></tbody></table></div>
+                        <div class="mt-3 p-3 bg-light rounded border border-light"><strong>หมายเหตุ:</strong> <span id="pr_remark" class="text-muted"></span></div>
+                    </div>
+
+                    <div id="memo_form_layout" style="display:none;">
+                        <div class="mb-4">
+                            <div class="row mb-2"><div class="col-2 fw-bold">หน่วยงาน</div><div class="col-10 border-bottom border-dark dotted"><span id="memo_from"></span></div></div>
+                            <div class="row mb-2"><div class="col-1 fw-bold">ที่</div><div class="col-5 border-bottom border-dark dotted"><span id="memo_no"></span></div><div class="col-1 fw-bold text-end">วันที่</div><div class="col-5 border-bottom border-dark dotted"><span id="memo_date"></span></div></div>
+                            <div class="row mb-2"><div class="col-1 fw-bold">เรื่อง</div><div class="col-11 border-bottom border-dark dotted"><span id="memo_subject"></span></div></div>
+                            <div class="row mb-3"><div class="col-1 fw-bold">เรียน</div><div class="col-11 fw-bold"><span id="memo_to"></span></div></div>
+                        </div>
+                        <div class="p-4 border rounded bg-white" style="min-height: 250px;"><p id="memo_content" style="white-space: pre-wrap;"></p></div>
+                    </div>
+
+                    <div id="attachment_area" class="mt-4 p-3 bg-primary bg-opacity-10 border border-primary rounded" style="display:none;"><i class="bi bi-paperclip me-2"></i> <strong>ไฟล์แนบ:</strong> <a href="#" id="attachment_link" target="_blank" class="text-decoration-none fw-bold">คลิกเพื่อเปิดดูเอกสาร</a></div>
+                    
+                    <div class="row text-center mt-5 pt-4 g-4">
+                        <div class="col-4"><div class="mb-2 fw-bold">ผู้จัดทำ</div><div class="mb-1 text-primary" id="sign_requester_name" style="height:30px;"></div><div class="border-top w-75 mx-auto"></div></div>
+                        <div class="col-4"><div class="mb-2 fw-bold">ผู้อนุมัติเบื้องต้น</div><div class="mb-1 fw-bold" id="sign_head_status" style="height:30px;"></div><div class="border-top w-75 mx-auto"></div></div>
+                        <div class="col-4"><div class="mb-2 fw-bold">ผู้อนุมัติ (ผู้บริหาร)</div><div class="mb-1 fw-bold" id="sign_manager_status" style="height:30px;"></div><div class="border-top w-75 mx-auto"></div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-white shadow-top py-3 d-flex justify-content-between align-items-center">
+                <div class="flex-grow-1 me-3"><input type="text" id="approval_comment" class="form-control" placeholder="ระบุเหตุผลรวม (กรณีตีกลับทั้งใบ)..."></div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-danger px-4 rounded-pill fw-bold" onclick="rejectDocument()"><i class="bi bi-x-circle me-2"></i> ตีกลับทั้งหมด</button>
+                    <button type="button" class="btn btn-success px-5 rounded-pill shadow-sm fw-bold" onclick="finalizeApproval()"><i class="bi bi-check-lg me-2"></i> อนุมัติ / ส่งต่อ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="logo.js"></script>
+<script>
+    function updateTabUI(mode) { document.getElementById('btnPending').className = mode === 'pending' ? 'btn btn-sm btn-white rounded shadow-sm fw-bold px-3' : 'btn btn-sm btn-light rounded px-3 text-muted'; document.getElementById('btnHistory').className = mode === 'history' ? 'btn btn-sm btn-white rounded shadow-sm fw-bold px-3' : 'btn btn-sm btn-light rounded px-3 text-muted'; }
+    document.addEventListener("DOMContentLoaded", function() {
+        const originalSwitchTab = window.switchTab; window.switchTab = function(mode) { originalSwitchTab(mode); updateTabUI(mode); };
+        const originalSwitchDoc = window.switchDocType; window.switchDocType = function(type) { originalSwitchDoc(type); document.getElementById('currentViewLabel').innerText = type.toUpperCase(); const cards = document.querySelectorAll('.stat-card'); cards.forEach(c => c.style.border = 'none'); if(type === 'pr') cards[0].style.border = '2px solid var(--primary-color)'; else cards[1].style.border = '2px solid var(--success-color)'; }
+    });
+</script>
+<script src="script.js"></script>
+</body>
+</html>

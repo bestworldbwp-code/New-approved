@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบเอกสารออนไลน์</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { background-color: #f0f2f5; font-family: 'Sarabun', sans-serif; }
+        .menu-card { transition: transform 0.2s; border: none; border-radius: 15px; cursor: pointer; text-decoration: none; color: inherit; }
+        .menu-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        .icon-box { width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; color: white; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container py-5">
+        <div class="text-center mb-5">
+            <img src="" class="app-logo mb-3" style="height: 100px;">
+            <h3 class="fw-bold text-dark">ระบบเอกสารออนไลน์</h3>
+            <p class="text-muted">บริษัท เบสท์เวิลด์ อินเตอร์พลาส จำกัด</p>
+        </div>
+
+        <div class="row g-4 justify-content-center">
+            <div class="col-md-4 col-sm-6">
+                <a href="pr.html" class="card menu-card h-100 shadow-sm">
+                    <div class="card-body text-center p-4">
+                        <div class="icon-box bg-primary mx-auto shadow-sm">📦</div>
+                        <h5 class="fw-bold">ขอซื้อสินค้า (PR)</h5>
+                        <p class="text-muted small mb-0">สร้างใบขอซื้อเพื่อขออนุมัติ</p>
+                    </div>
+                </a>
+            </div>
+
+            <div class="col-md-4 col-sm-6">
+                <a href="memo.html" class="card menu-card h-100 shadow-sm"> <div class="card-body text-center p-4">
+                        <div class="icon-box bg-success mx-auto shadow-sm">📝</div>
+                        <h5 class="fw-bold">บันทึกข้อความ (Memo)</h5>
+                        <p class="text-muted small mb-0">สร้างบันทึกข้อความภายใน</p>
+                    </div>
+                </a>
+            </div>
+
+            <div class="col-md-4 col-sm-6">
+                <a href="admin.html" class="card menu-card h-100 shadow-sm">
+                    <div class="card-body text-center p-4">
+                        <div class="icon-box bg-dark mx-auto shadow-sm">🔐</div>
+                        <h5 class="fw-bold">สำหรับผู้อนุมัติ</h5>
+                        <p class="text-muted small mb-0">ตรวจสอบและอนุมัติเอกสาร</p>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+    <script src="logo.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            if (typeof LOGO_BASE64 !== 'undefined') {
+                document.querySelectorAll('.app-logo').forEach(img => img.src = LOGO_BASE64);
+            }
+        });
+    </script>
+</body>
+</html>

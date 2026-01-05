@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>รายละเอียดบันทึกข้อความ</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { background: #525659; font-family: 'Sarabun', sans-serif; color: #000; } 
+        .page { background: white; width: 210mm; min-height: 297mm; padding: 15mm 20mm; margin: 10mm auto; position: relative; box-shadow: 0 0 20px rgba(0,0,0,0.3); } 
+        .sign-line { border-bottom: 1px dotted #000; width: 140px; margin: 5px auto; height: 5px; } 
+        .dotted { border-bottom: 1px dotted #000; }
+        @media print { 
+            body { background: white; margin: 0; } 
+            .page { width: 100%; margin: 0; box-shadow: none; border: none; } 
+            .no-print { display: none !important; } 
+        } 
+    </style>
+</head>
+<body>
+
+<div class="text-center mt-3 mb-3 no-print">
+    <button onclick="window.print()" class="btn btn-primary shadow">🖨️ สั่งพิมพ์ / บันทึก PDF</button>
+    <button onclick="window.close()" class="btn btn-secondary ms-2">ปิดหน้าต่าง</button>
+</div>
+
+<div class="page">
+    <div class="text-center mb-4 pb-3">
+        <div class="d-flex align-items-center justify-content-center mb-2">
+            <img src="" class="app-logo me-3" alt="Logo" style="height: 60px;">
+            <h4 class="fw-bold m-0">บริษัท เบสท์เวิลด์ อินเตอร์พลาส จำกัด</h4>
+        </div>
+        <h5 class="fw-bold text-uppercase" style="letter-spacing: 2px;">บันทึกข้อความ</h5>
+    </div>
+
+    <div class="mb-4">
+        <div class="row mb-2">
+            <div class="col-2 fw-bold">หน่วยงาน</div>
+            <div class="col-10 dotted"><span id="v_from"></span></div>
+        </div>
+        <div class="row mb-2">
+            <div class="col-1 fw-bold">ที่</div>
+            <div class="col-5 dotted"><span id="v_memo_no"></span></div>
+            <div class="col-1 fw-bold text-end">วันที่</div>
+            <div class="col-5 dotted"><span id="v_date"></span></div>
+        </div>
+        <div class="row mb-2">
+            <div class="col-1 fw-bold">เรื่อง</div>
+            <div class="col-11 dotted"><span id="v_subject"></span></div>
+        </div>
+        <div class="row mb-4">
+            <div class="col-1 fw-bold">เรียน</div>
+            <div class="col-11 fw-bold"><span id="v_to"></span></div>
+        </div>
+    </div>
+
+    <div class="mb-5" style="min-height: 400px;">
+        <p id="v_content" style="white-space: pre-wrap; line-height: 1.8; text-align: justify;"></p>
+        
+        <div id="v_attachment_area" class="mt-4 p-3 bg-light border rounded" style="display:none;">
+            <strong>เอกสารแนบ:</strong> <a href="#" id="v_attachment_link" target="_blank">เปิดดูเอกสาร</a>
+        </div>
+    </div>
+
+    <div class="row text-center mt-auto pt-5">
+        <div class="col-4">
+            <div class="fw-bold mb-2">ผู้จัดทำ</div>
+            <div class="mb-1 text-primary fw-bold" id="v_sign_requester"></div>
+            <div class="sign-line"></div>
+        </div>
+        <div class="col-4">
+            <div class="fw-bold mb-2">ผู้อนุมัติเบื้องต้น</div>
+            <div class="mb-1" id="v_sign_head">( ........................... )</div>
+            <div class="sign-line"></div>
+        </div>
+        <div class="col-4">
+            <div class="fw-bold mb-2">ผู้อนุมัติระดับสูง</div>
+            <div class="mb-1" id="v_sign_manager">( ........................... )</div>
+            <div class="sign-line"></div>
+        </div>
+    </div>
+</div>
+
+<script src="logo.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

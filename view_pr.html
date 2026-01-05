@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <title>รายละเอียดใบขอซื้อ</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { background: #525659; font-family: 'Sarabun', sans-serif; color: #000; } 
+        .page { background: white; width: 210mm; min-height: 297mm; padding: 15mm 20mm; margin: 10mm auto; position: relative; box-shadow: 0 0 20px rgba(0,0,0,0.3); } 
+        .table-bordered, .table-bordered th, .table-bordered td { border: 1px solid #000 !important; }
+        .sign-line { border-bottom: 1px dotted #000; width: 140px; margin: 5px auto; height: 5px; } 
+        @media print { 
+            body { background: white; margin: 0; } 
+            .page { width: 100%; margin: 0; box-shadow: none; border: none; } 
+            .no-print { display: none !important; } 
+        } 
+    </style>
+</head>
+<body>
+
+<div class="text-center mt-3 mb-3 no-print">
+    <button onclick="window.print()" class="btn btn-primary shadow">🖨️ สั่งพิมพ์ / บันทึก PDF</button>
+    <button onclick="window.close()" class="btn btn-secondary ms-2">ปิดหน้าต่าง</button>
+</div>
+
+<div class="page">
+    <div class="text-center mb-4 border-bottom border-dark pb-3">
+        <div class="d-flex align-items-center justify-content-center">
+            <img src="" class="app-logo me-3" alt="Logo" style="height: 60px;">
+            <div class="text-start">
+                <h4 class="fw-bold m-0">บริษัท เบสท์เวิลด์ อินเตอร์พลาส จำกัด</h4>
+                <small>328 ม.6 ต.คลองนิยมยาตรา อ.บางบ่อ จ.สมุทรปราการ 10560</small>
+            </div>
+        </div>
+        <h5 class="mt-3 fw-bold" id="doc_title">ใบขอซื้อ (Purchase Request)</h5>
+    </div>
+
+    <div class="row border border-dark p-3 mb-3 mx-0 rounded">
+        <div class="col-6 mb-2"><strong>เลขที่เอกสาร:</strong> <span id="v_pr_number">-</span></div>
+        <div class="col-6 mb-2"><strong>วันที่ขอ:</strong> <span id="v_created_at">-</span></div>
+        <div class="col-6 mb-2"><strong>ผู้ขอซื้อ:</strong> <span id="v_requester">-</span></div>
+        <div class="col-6 mb-2"><strong>แผนก:</strong> <span id="v_department">-</span></div>
+        <div class="col-6"><strong>วันที่ต้องการของ:</strong> <span id="v_required_date" class="text-danger">-</span></div>
+    </div>
+
+    <table class="table table-bordered table-sm align-middle">
+        <thead class="table-light text-center fw-bold">
+            <tr>
+                <th width="5%">#</th>
+                <th width="15%">รหัส</th>
+                <th>รายการสินค้า</th>
+                <th width="10%">จำนวน</th>
+                <th width="10%">หน่วย</th>
+                <th width="20%">สถานะ</th>
+            </tr>
+        </thead>
+        <tbody id="v_tableBody">
+            </tbody>
+    </table>
+
+    <div class="mt-2 mb-5"><strong>หมายเหตุ:</strong> <span id="v_remark">-</span></div>
+
+    <div class="row text-center mt-auto pt-5">
+        <div class="col-4">
+            <div class="fw-bold mb-2">ผู้ขอซื้อ</div>
+            <div class="mb-1 fw-bold text-primary" id="v_sign_requester"></div>
+            <div class="sign-line"></div>
+            <small>วันที่ ...../...../.....</small>
+        </div>
+        <div class="col-4">
+            <div class="fw-bold mb-2">ผู้อนุมัติเบื้องต้น</div>
+            <div class="mb-1" id="v_sign_head">( ........................... )</div>
+            <div class="sign-line"></div>
+            <small>วันที่ ...../...../.....</small>
+        </div>
+        <div class="col-4">
+            <div class="fw-bold mb-2">ผู้อนุมัติระดับสูง</div>
+            <div class="mb-1" id="v_sign_manager">( ........................... )</div>
+            <div class="sign-line"></div>
+            <small>วันที่ ...../...../.....</small>
+        </div>
+    </div>
+    
+    <div class="text-end mt-4 small text-muted">FQP-PUR-01:04 Rev.02</div>
+</div>
+
+<script src="logo.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
