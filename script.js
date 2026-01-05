@@ -408,7 +408,7 @@ window.toggleReason = function(index) {
     }
 }
 
-// [Logic ปุ่มเขียว: บันทึก + แจ้งเตือนครบทุกคน]
+// [Logic ปุ่มเขียว: บันทึก (รวมเวลา) + แจ้งเตือน]
 window.finalizeApproval = async function() {
     const btn = document.querySelector('.btn-success');
     btn.disabled = true; btn.innerText = '⏳ กำลังประมวลผล...';
@@ -419,6 +419,9 @@ window.finalizeApproval = async function() {
         let emailSubject = '';
         let emailTo = '';
         let emailContent = '';
+        
+        // เวลาปัจจุบันสำหรับประทับตรา
+        const now = new Date().toISOString();
 
         // --- Update รายสินค้า ---
         if (currentDocType === 'pr') {
@@ -447,17 +450,23 @@ window.finalizeApproval = async function() {
             }
         }
 
-        // --- Logic การส่งเมล ---
+        const updatePayload = { status: nextStatus };
+
+        // --- Logic การบันทึกเวลา + สถานะ ---
         if (currentUserRole === 'head') {
             nextStatus = 'pending_manager';
+            updatePayload.status = nextStatus;
+            updatePayload.head_approved_at = now; // บันทึกเวลา Head
+
             emailTo = CONFIG.managerEmail;
             emailSubject = `[อนุมัติขั้นที่ 1] PR ${currentDoc.pr_number} ผ่านการตรวจสอบแล้ว`;
             emailContent = `<h3>เรียน ผู้บริหาร</h3><p>PR เลขที่ ${currentDoc.pr_number} ผ่านการตรวจสอบจากหัวหน้าแผนกแล้ว</p><a href="${window.location.origin}/admin.html">เข้าสู่ระบบ</a>`;
 
         } else if (currentUserRole === 'manager') {
             nextStatus = 'processed';
+            updatePayload.status = nextStatus;
+            updatePayload.manager_approved_at = now; // บันทึกเวลา Manager
             
-            // 1. ส่งเมลหาฝ่ายจัดซื้อ (Purchasing)
             emailTo = CONFIG.purchasingEmail;
             emailSubject = `[Approved] คำสั่งซื้อ PR ${currentDoc.pr_number} อนุมัติแล้ว`;
             
@@ -472,36 +481,27 @@ window.finalizeApproval = async function() {
                 <p>2. <a href="${linkOriginal}" style="font-weight:bold; color:gray;">📄 ต้นฉบับทั้งหมด (Log)</a></p>
             `;
 
-            // 2. [เพิ่ม] ส่งเมลแจ้งผลกลับไปหา "ผู้ขอ (Requester)"
             if (currentDoc.email) {
                 await emailjs.send(CONFIG.emailServiceId, CONFIG.emailTemplateId_Master, { 
                     to_email: currentDoc.email, 
                     subject: `[Approved] อนุมัติแล้ว: ${currentDoc.pr_number || currentDoc.memo_no}`, 
-                    html_content: `
-                        <h3>เรียน คุณ${currentDoc.requester || 'ผู้ขอ'}</h3>
-                        <p>รายการ <b>${currentDoc.pr_number || currentDoc.memo_no}</b> ได้รับการอนุมัติจากผู้บริหารเรียบร้อยแล้ว</p>
-                        <hr>
-                        <p>เอกสารถูกส่งต่อไปยังฝ่ายจัดซื้อเพื่อดำเนินการสั่งซื้อต่อไป</p>
-                        <p>สามารถติดตามสถานะได้ที่ระบบ</p>
-                    ` 
+                    html_content: `<h3>เรียน คุณ${currentDoc.requester || 'ผู้ขอ'}</h3><p>รายการ <b>${currentDoc.pr_number || currentDoc.memo_no}</b> ได้รับการอนุมัติแล้ว</p>` 
                 });
             }
         }
 
-        const updatePayload = { status: nextStatus };
         if (currentDocType === 'pr') updatePayload.items = currentDoc.items;
         
         const { error } = await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
         if (error) throw error;
 
-        // ส่งเมลหลัก (หาหัวหน้า หรือ หาจัดซื้อ)
         if (emailTo) {
             await emailjs.send(CONFIG.emailServiceId, CONFIG.emailTemplateId_Master, { 
                 to_email: emailTo, subject: emailSubject, html_content: emailContent 
             });
         }
 
-        alert('✅ บันทึกผลการพิจารณาเรียบร้อย!');
+        alert('✅ บันทึกผลและเวลาอนุมัติเรียบร้อย!');
         bootstrap.Modal.getInstance(document.getElementById('detailModal')).hide();
         loadData();
 
@@ -511,39 +511,36 @@ window.finalizeApproval = async function() {
 window.rejectDocument = async function() {
     const comment = document.getElementById('approval_comment').value.trim();
     if (!comment) { alert("⚠️ กรุณาระบุเหตุผลที่ตีกลับเอกสาร"); return; }
-    
     const btn = document.querySelector('.btn-outline-danger');
     btn.disabled = true; btn.innerText = '⏳ กำลังบันทึก...';
-
     try {
         const tableName = currentDocType === 'pr' ? 'purchase_requests' : 'memos';
         let updatePayload = { status: 'rejected' };
-        
         if(currentDocType === 'pr') {
             const roleName = currentUserRole === 'head' ? 'หัวหน้าแผนก' : 'ผู้บริหาร';
-            currentDoc.items.forEach(item => { 
-                item.status = 'rejected'; 
-                item.remark = `ตีกลับทั้งใบโดย ${roleName}: ${comment}`; 
-            });
+            currentDoc.items.forEach(item => { item.status = 'rejected'; item.remark = `ตีกลับทั้งใบโดย ${roleName}: ${comment}`; });
             updatePayload.items = currentDoc.items;
         }
         await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
-        
         if (currentDoc.email) {
             await emailjs.send(CONFIG.emailServiceId, CONFIG.emailTemplateId_Master, { 
-                to_email: currentDoc.email, 
-                subject: `[Rejected] รายการ ${currentDoc.pr_number || currentDoc.memo_no} ถูกตีกลับ`, 
-                html_content: `<h3 style="color:red;">รายการนี้ถูกตีกลับ</h3><p><b>เหตุผล:</b> ${comment}</p>` 
+                to_email: currentDoc.email, subject: `[Rejected] รายการถูกตีกลับ`, html_content: `<h3 style="color:red;">รายการนี้ถูกตีกลับ</h3><p><b>เหตุผล:</b> ${comment}</p>` 
             });
         }
-        
         alert('❌ ตีกลับเอกสารเรียบร้อย');
         bootstrap.Modal.getInstance(document.getElementById('detailModal')).hide();
         loadData();
     } catch(err) { console.error(err); alert('Error: ' + err.message); } finally { if(btn) { btn.disabled = false; btn.innerText = 'ตีกลับเอกสาร'; } }
 }
 
-// ================= 7. VIEW / PRINT LOADERS =================
+// ================= 7. VIEW / PRINT LOADERS (เพิ่มการแสดงเวลา) =================
+// Helper Formatter
+const formatDate = (isoStr) => {
+    if(!isoStr) return "";
+    const d = new Date(isoStr);
+    return `${d.toLocaleDateString('th-TH')} ${d.toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'})}`;
+};
+
 async function loadPRForPrint() {
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
@@ -570,7 +567,6 @@ async function loadPRForPrint() {
         displayItems.forEach((item, index) => {
             let statusBadge = '';
             let rowStyle = '';
-
             if (item.status === 'approved') {
                 statusBadge = '<span class="fw-bold text-success">✅ อนุมัติ</span>';
             } else if (item.status === 'rejected') {
@@ -579,18 +575,28 @@ async function loadPRForPrint() {
             } else {
                 statusBadge = '<span class="text-warning">รอพิจารณา</span>';
             }
-
             tbody.innerHTML += `<tr style="${rowStyle}"><td class="text-center">${index + 1}</td><td>${item.code || '-'}</td><td>${item.description}</td><td class="text-center">${item.quantity}</td><td class="text-center">${item.unit}</td><td class="text-center">${statusBadge}</td></tr>`;
         });
 
+        // Signatures & Dates
         document.getElementById('v_sign_requester').innerText = pr.requester;
-        if (pr.status !== 'pending_head' && pr.status !== 'pending') document.getElementById('v_sign_head').innerHTML = `( ผู้อนุมัติเบื้องต้น ${pr.department} )<br><span class="text-success small">อนุมัติออนไลน์</span>`; 
-        if (pr.status === 'processed') document.getElementById('v_sign_manager').innerHTML = '( เบญจมาศ ถิ่นจันทร์ )<br><span class="text-success small">อนุมัติออนไลน์</span>'; 
+        document.getElementById('v_sign_date_req').innerText = "วันที่ " + new Date(pr.created_at).toLocaleDateString('th-TH');
+
+        if (pr.status !== 'pending_head' && pr.status !== 'pending') {
+            let headTime = pr.head_approved_at ? `<br><span class="text-dark small">วันที่ ${formatDate(pr.head_approved_at)}</span>` : '';
+            document.getElementById('v_sign_head').innerHTML = `( ผู้อนุมัติเบื้องต้น ${pr.department} )<br><span class="text-success small">อนุมัติออนไลน์</span>${headTime}`; 
+        }
+        if (pr.status === 'processed') { 
+            let managerTime = pr.manager_approved_at ? `<br><span class="text-dark small">วันที่ ${formatDate(pr.manager_approved_at)}</span>` : '';
+            document.getElementById('v_sign_manager').innerHTML = `( เบญจมาศ ถิ่นจันทร์ )<br><span class="text-success small">อนุมัติออนไลน์</span>${managerTime}`; 
+        }
 
     } catch (err) { alert('Error: ' + err.message); }
 }
 
 async function loadMemoForPrint() {
+    // (Memo Function ยังคงเดิม)
+    // ... Copy ส่วน Memo เดิมมาใส่ หรือใช้ Logic เดียวกันถ้าต้องการโชว์เวลาใน Memo ด้วย ...
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
     if (!id) return;
