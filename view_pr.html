@@ -27,7 +27,7 @@
             page-break-after: always; /* สั่งให้ปริ้นแล้วขึ้นหน้าใหม่ */
         }
 
-        /* ซ่อน Template ต้นฉบับ */
+        /* ซ่อน Template ต้นฉบับ (เอาไว้โคลน) */
         #page-template { display: none; }
 
         .table-bordered, .table-bordered th, .table-bordered td { border: 1px solid #000 !important; }
@@ -38,7 +38,7 @@
             body { background: white; } 
             #pages-container { padding: 0; display: block; }
             .page { margin: 0; box-shadow: none; border: none; height: 297mm; width: 100%; page-break-after: always; } 
-            .page:last-child { page-break-after: auto; }
+            .page:last-child { page-break-after: auto; } /* หน้าสุดท้ายไม่ต้องขึ้นหน้าว่างต่อ */
             .no-print { display: none !important; } 
         } 
     </style>
