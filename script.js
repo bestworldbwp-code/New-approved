@@ -35,7 +35,12 @@ const CONFIG = {
 
 // ================= 2. SYSTEM START =================
 const db = supabase.createClient(CONFIG.supaUrl, CONFIG.supaKey);
-if(typeof emailjs !== 'undefined') emailjs.init(CONFIG.emailPublicKey);
+// เช็ค EmailJS ก่อนเริ่ม
+let isEmailEnabled = false;
+if(typeof emailjs !== 'undefined') {
+    emailjs.init(CONFIG.emailPublicKey);
+    isEmailEnabled = true;
+}
 
 let currentUserRole = sessionStorage.getItem('userRole') || ''; 
 let currentUserDept = sessionStorage.getItem('userDept') || ''; 
@@ -64,7 +69,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 
-// ================= 3. MEMO FORM (ถามก่อนพิมพ์) =================
+// ================= 3. MEMO FORM =================
 const memoForm = document.getElementById('memoForm');
 if (memoForm) {
     memoForm.addEventListener('submit', async (e) => {
@@ -101,28 +106,35 @@ if (memoForm) {
             if (error) throw error;
             const newId = data[0].id;
 
-            // ส่งเมลหาผู้อนุมัติ (คงไว้เพื่อให้ระบบเดิน)
-            const headEmail = CONFIG.departmentHeads[payload.from_dept];
-            const adminLink = window.location.origin + '/admin.html';
-            if (headEmail) {
-                await emailjs.send(CONFIG.emailServiceId, CONFIG.emailTemplateId_Master, { 
-                    to_email: headEmail, 
-                    subject: `[New Memo] ขออนุมัติ Memo: ${payload.memo_no}`, 
-                    html_content: `<h3>เรียน ผู้อนุมัติเบื้องต้น (${payload.from_dept})</h3><p>Memo เลขที่ ${payload.memo_no} รอตรวจสอบ</p><a href="${adminLink}">คลิกเพื่อเข้าสู่ระบบ</a>` 
-                });
+            // พยายามส่งเมล (ถ้าพัง ให้ข้ามไป)
+            try {
+                const headEmail = CONFIG.departmentHeads[payload.from_dept];
+                const adminLink = window.location.origin + '/admin.html';
+                if (headEmail && isEmailEnabled) {
+                    await emailjs.send(CONFIG.emailServiceId, CONFIG.emailTemplateId_Master, { 
+                        to_email: headEmail, 
+                        subject: `[New Memo] ขออนุมัติ Memo: ${payload.memo_no}`, 
+                        html_content: `<h3>เรียน ผู้อนุมัติเบื้องต้น (${payload.from_dept})</h3><p>Memo เลขที่ ${payload.memo_no} รอตรวจสอบ</p><a href="${adminLink}">คลิกเพื่อเข้าสู่ระบบ</a>` 
+                    });
+                }
+            } catch (emailErr) {
+                console.warn("Email Error:", emailErr);
             }
             
-            // ถามผู้ใช้ให้พิมพ์ PDF ทันที
-            if(confirm('✅ บันทึก Memo เรียบร้อย!\nคุณต้องการเปิดหน้าสำหรับ "พิมพ์/บันทึก PDF" เลยหรือไม่?')) {
-                window.open(`view_memo.html?id=${newId}`, '_blank');
-            }
-            window.location.reload();
+            // เปิดหน้า PDF ทันที
+            window.open(`view_memo.html?id=${newId}`, '_blank');
+            
+            // รอสักพักแล้วค่อยเคลียร์ฟอร์ม
+            setTimeout(() => {
+                alert('✅ บันทึก Memo เรียบร้อย!');
+                window.location.href = 'index.html'; // กลับหน้าเมนูหลัก
+            }, 1000);
 
-        } catch (err) { console.error(err); alert('Error: ' + err.message); } finally { btn.disabled = false; btn.innerText = originalText; }
+        } catch (err) { console.error(err); alert('Error: ' + err.message); btn.disabled = false; btn.innerText = originalText; }
     });
 }
 
-// ================= 4. PR FORM (ถามก่อนพิมพ์) =================
+// ================= 4. PR FORM (แก้: ส่งแล้วเปิด PDF -> กลับหน้าหลัก) =================
 window.addItemRow = function() {
     const container = document.getElementById('itemsContainer');
     if (!container) return; 
@@ -193,24 +205,35 @@ if (prForm) {
                 status: 'pending_head' 
             };
             
+            // Insert และขอ ID กลับมา
             const { data, error } = await db.from('purchase_requests').insert([payload]).select();
             if (error) throw error;
             const newId = data[0].id;
 
-            const adminLink = window.location.origin + '/admin.html';
-            await emailjs.send(CONFIG.emailServiceId, CONFIG.emailTemplateId_Master, { 
-                to_email: headEmail, 
-                subject: `[New PR] แผนก${dept} ขอตรวจสอบ PR: ${payload.pr_number}`, 
-                html_content: `<h3>เรียน ผู้อนุมัติเบื้องต้น (${dept})</h3><p>มีรายการขอซื้อใหม่จาก <b>${payload.requester}</b> รอการตรวจสอบ</p><p>เลขที่ PR: ${payload.pr_number}</p><p><a href="${adminLink}">คลิกเพื่อเข้าสู่ระบบอนุมัติ</a></p>` 
-            });
-
-            // ถามผู้ใช้ให้พิมพ์ PDF ทันที
-            if(confirm('✅ ส่งคำขอ PR เรียบร้อย!\nคุณต้องการเปิดหน้าสำหรับ "พิมพ์/บันทึก PDF" เพื่อเก็บเป็นหลักฐานเลยหรือไม่?')) {
-                window.open(`view_pr.html?id=${newId}&mode=original`, '_blank');
+            // ส่งเมล (ใส่ try-catch แยก เพื่อไม่ให้บล็อคการทำงานถ้าส่งไม่ผ่าน)
+            try {
+                const adminLink = window.location.origin + '/admin.html';
+                if(isEmailEnabled) {
+                    await emailjs.send(CONFIG.emailServiceId, CONFIG.emailTemplateId_Master, { 
+                        to_email: headEmail, 
+                        subject: `[New PR] แผนก${dept} ขอตรวจสอบ PR: ${payload.pr_number}`, 
+                        html_content: `<h3>เรียน ผู้อนุมัติเบื้องต้น (${dept})</h3><p>มีรายการขอซื้อใหม่จาก <b>${payload.requester}</b> รอการตรวจสอบ</p><p>เลขที่ PR: ${payload.pr_number}</p><p><a href="${adminLink}">คลิกเพื่อเข้าสู่ระบบอนุมัติ</a></p>` 
+                    });
+                }
+            } catch (emailErr) {
+                console.error("Email sending failed but data saved:", emailErr);
             }
-            window.location.reload();
 
-        } catch (err) { console.error(err); alert('Error: ' + err.message); } finally { btn.disabled = false; btn.innerText = originalText; }
+            // เปิดหน้า PDF ใน Tab ใหม่
+            window.open(`view_pr.html?id=${newId}&mode=original`, '_blank');
+            
+            // แจ้งเตือนและกลับหน้าหลัก
+            setTimeout(() => {
+                alert(`✅ ส่งคำขอ PR เรียบร้อย!`); 
+                window.location.href = 'index.html'; // กลับหน้าเมนูหลัก ไม่เด้งกลับหน้าเดิม
+            }, 500);
+
+        } catch (err) { console.error(err); alert('Error: ' + err.message); btn.disabled = false; btn.innerText = originalText; }
     });
 }
 
@@ -377,6 +400,7 @@ window.openDetailModal = function(id) {
         }
 
     } else {
+        // Memo Logic
         document.getElementById('doc_type_title').innerText = "บันทึกข้อความ (Memo)";
         document.getElementById('pr_form_layout').style.display = 'none';
         document.getElementById('memo_form_layout').style.display = 'block';
@@ -418,10 +442,10 @@ window.toggleReason = function(index) {
     }
 }
 
-// [Logic ปุ่มเขียว: บันทึก (รวมเวลา) + ไม่ส่งเมลหา Requester]
+// [Logic ปุ่มเขียว: บันทึก (แก้: บันทึกก่อนส่งเมล เพื่อป้องกันปุ่มค้าง)]
 window.finalizeApproval = async function() {
     const btn = document.querySelector('.btn-success');
-    btn.disabled = true; btn.innerText = '⏳ กำลังประมวลผล...';
+    btn.disabled = true; btn.innerText = '⏳ กำลังบันทึก...';
 
     try {
         const tableName = currentDocType === 'pr' ? 'purchase_requests' : 'memos';
@@ -429,7 +453,6 @@ window.finalizeApproval = async function() {
         let emailSubject = '';
         let emailTo = '';
         let emailContent = '';
-        
         const now = new Date().toISOString();
 
         if (currentDocType === 'pr') {
@@ -438,7 +461,7 @@ window.finalizeApproval = async function() {
             checkboxes.forEach(cb => {
                 const idx = cb.getAttribute('data-index');
                 const isApproved = cb.checked;
-                const reasonInput = document.getElementById(`reason-${idx}`).value;
+                const reasonInput = document.getElementById(`reason-${idx}`)?.value || ''; // ใส่ ? เพื่อกัน Error
                 if (!isApproved && !reasonInput.trim()) hasRejectionWithoutReason = true;
 
                 const roleName = currentUserRole === 'head' ? 'หัวหน้าแผนก' : 'ผู้บริหาร';
@@ -458,13 +481,13 @@ window.finalizeApproval = async function() {
             }
         }
 
-        const updatePayload = { status: nextStatus };
+        const updatePayload = { status: '' };
 
+        // กำหนด Status ถัดไป
         if (currentUserRole === 'head') {
             nextStatus = 'pending_manager';
             updatePayload.status = nextStatus;
             updatePayload.head_approved_at = now; 
-
             emailTo = CONFIG.managerEmail;
             emailSubject = `[อนุมัติขั้นที่ 1] PR ${currentDoc.pr_number} ผ่านการตรวจสอบแล้ว`;
             emailContent = `<h3>เรียน ผู้บริหาร</h3><p>PR เลขที่ ${currentDoc.pr_number} ผ่านการตรวจสอบจากหัวหน้าแผนกแล้ว</p><a href="${window.location.origin}/admin.html">เข้าสู่ระบบ</a>`;
@@ -473,36 +496,37 @@ window.finalizeApproval = async function() {
             nextStatus = 'processed';
             updatePayload.status = nextStatus;
             updatePayload.manager_approved_at = now; 
-            
             emailTo = CONFIG.purchasingEmail;
             emailSubject = `[Approved] คำสั่งซื้อ PR ${currentDoc.pr_number} อนุมัติแล้ว`;
             
             const linkApproved = window.location.origin + `/view_pr.html?id=${currentDoc.id}&mode=approved`;
             const linkOriginal = window.location.origin + `/view_pr.html?id=${currentDoc.id}&mode=original`;
-
             emailContent = `
-                <h3>เรียน ฝ่ายจัดซื้อ</h3>
-                <p>PR เลขที่ <b>${currentDoc.pr_number}</b> อนุมัติเรียบร้อยแล้ว</p>
-                <hr>
-                <p>1. <a href="${linkApproved}" style="font-weight:bold; color:green;">📂 รายการที่อนุมัติ (PO)</a></p>
-                <p>2. <a href="${linkOriginal}" style="font-weight:bold; color:gray;">📄 ต้นฉบับทั้งหมด (Log)</a></p>
+                <h3>เรียน ฝ่ายจัดซื้อ</h3><p>PR เลขที่ <b>${currentDoc.pr_number}</b> อนุมัติเรียบร้อยแล้ว</p>
+                <hr><p>1. <a href="${linkApproved}">📂 ไฟล์ PO</a></p><p>2. <a href="${linkOriginal}">📄 ไฟล์ Log ต้นฉบับ</a></p>
             `;
-            // ตัดการส่งอีเมลหา Requester ออกตามที่ขอ
         }
 
         if (currentDocType === 'pr') updatePayload.items = currentDoc.items;
         
+        // --- 1. บันทึกลง DB ก่อน (สำคัญสุด) ---
         const { error } = await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
         if (error) throw error;
 
-        // ยังส่งเมลหา Manager/Purchasing ตามปกติ
-        if (emailTo) {
-            await emailjs.send(CONFIG.emailServiceId, CONFIG.emailTemplateId_Master, { 
-                to_email: emailTo, subject: emailSubject, html_content: emailContent 
-            });
+        // --- 2. ส่งเมลทีหลัง (ใส่ try-catch ไม่ให้พังถ้าเน็ตหลุด) ---
+        try {
+            if (emailTo && isEmailEnabled) {
+                btn.innerText = '⏳ กำลังส่งเมล...';
+                await emailjs.send(CONFIG.emailServiceId, CONFIG.emailTemplateId_Master, { 
+                    to_email: emailTo, subject: emailSubject, html_content: emailContent 
+                });
+            }
+        } catch (emailErr) {
+            console.warn("Email Failed (But Saved):", emailErr);
+            alert("บันทึกสำเร็จ (แต่ส่งอีเมลแจ้งเตือนไม่ผ่าน กรุณาแจ้งผู้เกี่ยวข้องทางอื่น)");
         }
 
-        alert('✅ บันทึกผลและเวลาอนุมัติเรียบร้อย!');
+        alert('✅ บันทึกผลอนุมัติเรียบร้อย!');
         bootstrap.Modal.getInstance(document.getElementById('detailModal')).hide();
         loadData();
 
@@ -524,15 +548,13 @@ window.rejectDocument = async function() {
         }
         await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
         
-        // ตัดการส่งเมลหา Requester ออกตามที่ขอ
-        
         alert('❌ ตีกลับเอกสารเรียบร้อย');
         bootstrap.Modal.getInstance(document.getElementById('detailModal')).hide();
         loadData();
     } catch(err) { console.error(err); alert('Error: ' + err.message); } finally { if(btn) { btn.disabled = false; btn.innerText = 'ตีกลับเอกสาร'; } }
 }
 
-// ================= 7. VIEW / PRINT LOADERS (PAGINATION LOGIC) =================
+// ================= 7. VIEW / PRINT LOADERS (Auto Pagination) =================
 const formatDate = (isoStr) => {
     if(!isoStr) return "";
     const d = new Date(isoStr);
@@ -551,21 +573,18 @@ async function loadPRForPrint() {
         let displayItems = pr.items;
         if (mode === 'approved') displayItems = pr.items.filter(item => item.status === 'approved');
 
-        // ==== PAGINATION LOGIC: แบ่งหน้าอัตโนมัติ ====
-        const ITEMS_PER_PAGE = 12; // 12 รายการต่อหน้า (กำลังสวย)
+        const ITEMS_PER_PAGE = 12; 
         const totalItems = displayItems.length;
         const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
         const container = document.getElementById('pages-container');
         const template = document.getElementById('page-template').innerHTML;
 
-        container.innerHTML = ''; // Clear
+        container.innerHTML = ''; 
 
         for (let i = 0; i < totalPages; i++) {
-            // สร้างหน้าใหม่
             const pageDiv = document.createElement('div');
             pageDiv.innerHTML = template;
             
-            // ใส่ข้อมูล Header
             pageDiv.querySelector('.v_pr_number').innerText = pr.pr_number;
             pageDiv.querySelector('.v_created_at').innerText = new Date(pr.created_at).toLocaleDateString('th-TH');
             pageDiv.querySelector('.v_requester').innerText = pr.requester;
@@ -576,7 +595,6 @@ async function loadPRForPrint() {
             if (mode === 'approved') pageDiv.querySelector('.doc-title').innerHTML += ' <span class="text-success" style="font-size:16px;">(รายการที่อนุมัติ)</span>';
             else if (mode === 'original') pageDiv.querySelector('.doc-title').innerHTML += ' <span class="text-secondary" style="font-size:16px;">(ต้นฉบับทั้งหมด)</span>';
 
-            // ใส่รายการสินค้า (เฉพาะของหน้านี้)
             const start = i * ITEMS_PER_PAGE;
             const end = start + ITEMS_PER_PAGE;
             const pageItems = displayItems.slice(start, end);
@@ -584,36 +602,22 @@ async function loadPRForPrint() {
 
             pageItems.forEach((item, index) => {
                 let globalIndex = start + index + 1;
-                let statusBadge = '';
-                let rowStyle = '';
-                if (item.status === 'approved') {
-                    statusBadge = '<span class="fw-bold text-success">✅ อนุมัติ</span>';
-                } else if (item.status === 'rejected') {
-                    statusBadge = `<span class="text-danger fw-bold">❌ ไม่อนุมัติ</span><br><span class="text-danger small d-block mt-1">${item.remark}</span>`;
-                    if(mode === 'original') rowStyle = 'background-color: #fff5f5;'; 
-                } else {
-                    statusBadge = '<span class="text-warning">รอพิจารณา</span>';
-                }
+                let statusBadge = item.status === 'approved' ? '<span class="fw-bold text-success">✅ อนุมัติ</span>' : `<span class="text-danger fw-bold">❌ ไม่อนุมัติ</span><br><span class="text-danger small d-block mt-1">${item.remark}</span>`;
+                if(item.status === 'pending') statusBadge = '<span class="text-warning">รอพิจารณา</span>';
+                let rowStyle = (item.status === 'rejected' && mode === 'original') ? 'background-color: #fff5f5;' : '';
                 tbody.innerHTML += `<tr style="${rowStyle}"><td class="text-center">${globalIndex}</td><td>${item.code || '-'}</td><td>${item.description}</td><td class="text-center">${item.quantity}</td><td class="text-center">${item.unit}</td><td class="text-center">${statusBadge}</td></tr>`;
             });
 
-            // เติมบรรทัดว่างให้เต็มตาราง
             const emptyRows = ITEMS_PER_PAGE - pageItems.length;
-            for(let k=0; k<emptyRows; k++) {
-                tbody.innerHTML += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>`;
-            }
+            for(let k=0; k<emptyRows; k++) tbody.innerHTML += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>`;
 
-            // จัดการ Footer (ลายเซ็น)
             const footer = pageDiv.querySelector('.footer-section');
             if (i < totalPages - 1) {
-                // ถ้าไม่ใช่หน้าสุดท้าย ให้ซ่อนลายเซ็น
                 footer.style.display = 'none'; 
             } else {
-                // หน้าสุดท้าย -> แสดงลายเซ็น + วันที่อนุมัติ
                 pageDiv.querySelector('.v_remark').innerText = pr.header_remark || '-';
                 pageDiv.querySelector('.v_sign_requester').innerText = pr.requester;
                 pageDiv.querySelector('.v_sign_date_req').innerText = "วันที่ " + new Date(pr.created_at).toLocaleDateString('th-TH');
-
                 if (pr.status !== 'pending_head' && pr.status !== 'pending') {
                     let headTime = pr.head_approved_at ? `<br><span class="text-dark small">วันที่ ${formatDate(pr.head_approved_at)}</span>` : '';
                     pageDiv.querySelector('.v_sign_head').innerHTML = `( ผู้อนุมัติเบื้องต้น ${pr.department} )<br><span class="text-success small">อนุมัติออนไลน์</span>${headTime}`; 
@@ -623,10 +627,8 @@ async function loadPRForPrint() {
                     pageDiv.querySelector('.v_sign_manager').innerHTML = `( เบญจมาศ ถิ่นจันทร์ )<br><span class="text-success small">อนุมัติออนไลน์</span>${managerTime}`; 
                 }
             }
-
             container.appendChild(pageDiv);
         }
-
     } catch (err) { alert('Error: ' + err.message); }
 }
 
