@@ -24,7 +24,11 @@ const CONFIG = {
 
     // รหัสผ่านเข้าสู่ระบบ (Admin)
     passwords: {
-        '1001': 'จัดซื้อ', '1002': 'QC', '1003': 'ซ่อมบำรุง', '1004': 'ฝ่ายผลิต', '1005': 'HR',
+        '1001': 'จัดซื้อ', 
+        '1002': 'QC', 
+        '1003': 'ซ่อมบำรุง', 
+        '1004': 'ฝ่ายผลิต', 
+        '1005': 'HR',
         '9999': 'MANAGER_ROLE' 
     }
 };
@@ -48,6 +52,8 @@ document.addEventListener("DOMContentLoaded", function() {
     if (typeof LOGO_BASE64 !== 'undefined') {
         document.querySelectorAll('.app-logo').forEach(img => img.src = LOGO_BASE64);
     }
+    
+    // Check Admin Page
     if (window.location.href.includes('admin.html')) {
         const overlay = document.getElementById('loginOverlay');
         if (overlay) {
@@ -55,7 +61,9 @@ document.addEventListener("DOMContentLoaded", function() {
                 overlay.style.display = 'none';
                 updateAdminUI();
                 loadData(); 
-            } else { overlay.style.display = 'flex'; }
+            } else {
+                overlay.style.display = 'flex';
+            }
         }
     }
 });
@@ -80,6 +88,7 @@ if (memoForm) {
                 const { data: urlData } = db.storage.from('pr-files').getPublicUrl(fileName);
                 publicUrl = urlData.publicUrl;
             }
+
             btn.innerText = '⏳ บันทึก...';
             const payload = {
                 memo_no: document.getElementById('m_no').value,
@@ -91,10 +100,12 @@ if (memoForm) {
                 attachment_url: publicUrl,
                 status: 'pending_head'
             };
+
             const { data, error } = await db.from('memos').insert([payload]).select();
             if (error) throw error;
             const newId = data[0].id;
-            
+
+            // ส่งเมลหาหัวหน้า (Try-Catch เพื่อไม่ให้ระบบล่มถ้าเมลเต็ม)
             try {
                 const headEmail = CONFIG.departmentHeads[payload.from_dept];
                 const adminLink = window.location.origin + '/admin.html';
@@ -106,12 +117,12 @@ if (memoForm) {
                     });
                 }
             } catch(e) { console.warn('Email failed', e); }
-
-            // [FIXED] ใช้ confirm เพื่อหยุดรอก่อนเปิดหน้าใหม่
-            if(confirm('✅ บันทึก Memo เรียบร้อย!\n\nกด "ตกลง" เพื่อเปิดหน้าพิมพ์เอกสารเก็บไว้\nกด "ยกเลิก" เพื่อกลับหน้าหลัก')) {
+            
+            // ถามพิมพ์ PDF
+            if(confirm('✅ บันทึกสำเร็จ!\nต้องการเปิดหน้าพิมพ์ PDF เพื่อเก็บหลักฐานเลยหรือไม่?')) {
                 window.open(`view_memo.html?id=${newId}`, '_blank');
             }
-            window.location.href = 'index.html'; 
+            window.location.href = 'index.html';
 
         } catch (err) { console.error(err); alert('Error: ' + err.message); btn.disabled = false; btn.innerText = originalText; }
     });
@@ -150,6 +161,7 @@ if (prForm) {
             const dept = document.getElementById('department').value;
             const headEmail = CONFIG.departmentHeads[dept];
             if (!headEmail) { alert("⚠️ ไม่พบอีเมลผู้อนุมัติของแผนกนี้"); throw new Error("Email not found"); }
+            
             let publicUrl = null;
             const fileInput = document.getElementById('attachment');
             if (fileInput.files.length > 0) {
@@ -161,6 +173,7 @@ if (prForm) {
                 const { data: urlData } = db.storage.from('pr-files').getPublicUrl(fileName);
                 publicUrl = urlData.publicUrl;
             }
+
             btn.innerText = '⏳ บันทึก...';
             const items = [];
             document.querySelectorAll('.item-row').forEach(row => { 
@@ -173,6 +186,7 @@ if (prForm) {
                     remark: ''
                 }); 
             });
+
             const payload = { 
                 department: dept, 
                 pr_number: document.getElementById('pr_number').value, 
@@ -184,10 +198,12 @@ if (prForm) {
                 attachment_url: publicUrl, 
                 status: 'pending_head' 
             };
+            
             const { data, error } = await db.from('purchase_requests').insert([payload]).select();
             if (error) throw error;
             const newId = data[0].id;
-            
+
+            // ส่งเมลหาหัวหน้า
             try {
                 const adminLink = window.location.origin + '/admin.html';
                 if(isEmailEnabled) {
@@ -199,12 +215,11 @@ if (prForm) {
                 }
             } catch (emailErr) { console.error("Email sending failed but data saved:", emailErr); }
 
-            // [FIXED] ปรับ UX ให้ชัดเจนและรอการกด
+            // ถามพิมพ์ PDF
             if(confirm('✅ ส่งคำขอ PR เรียบร้อย!\n\nกด "ตกลง" เพื่อเปิดหน้าพิมพ์เอกสารต้นฉบับเก็บไว้ (แนะนำ)\nกด "ยกเลิก" เพื่อกลับหน้าเมนูหลัก')) {
                 window.open(`view_pr.html?id=${newId}&mode=original`, '_blank');
             }
-            // กลับหน้าหลัก
-            window.location.href = 'index.html'; 
+            window.location.href = 'index.html';
 
         } catch (err) { console.error(err); alert('Error: ' + err.message); btn.disabled = false; btn.innerText = originalText; }
     });
@@ -241,37 +256,48 @@ async function loadData() {
     if (!tableBody) return;
     tableBody.innerHTML = '<tr><td colspan="5" class="text-center p-4">⏳ กำลังโหลด...</td></tr>';
     updateBadges();
+
     try {
         const tableName = currentDocType === 'pr' ? 'purchase_requests' : 'memos';
         let query = db.from(tableName).select('*').order('created_at', { ascending: false });
+
         if (currentMode === 'pending') {
             if (currentUserRole === 'head') {
                 query = query.eq('status', 'pending_head');
                 if(currentDocType === 'pr') query = query.eq('department', currentUserDept);
                 else query = query.eq('from_dept', currentUserDept);
-            } else if (currentUserRole === 'manager') { query = query.eq('status', 'pending_manager'); }
+            } else if (currentUserRole === 'manager') {
+                query = query.eq('status', 'pending_manager');
+            }
         } else {
             if (currentUserRole === 'head') {
                 query = query.neq('status', 'pending_head');
                 if(currentDocType === 'pr') query = query.eq('department', currentUserDept);
                 else query = query.eq('from_dept', currentUserDept);
-            } else { query = query.in('status', ['processed', 'rejected']); }
+            } else {
+                query = query.in('status', ['processed', 'rejected']);
+            }
         }
+
         const { data, error } = await query;
         if (error) throw error;
         allDocs = data;
         tableBody.innerHTML = '';
+        
         if (data.length === 0) { tableBody.innerHTML = `<tr><td colspan="5" class="text-center p-5 text-muted">ไม่พบรายการ</td></tr>`; return; }
+
         data.forEach(doc => {
             const date = new Date(doc.created_at || doc.date).toLocaleDateString('th-TH');
             let docNo = currentDocType === 'pr' ? doc.pr_number : doc.memo_no;
             let from = currentDocType === 'pr' ? `${doc.requester} (${doc.department})` : `${doc.from_dept} : ${doc.subject}`;
             let statusText = doc.status;
             let badgeClass = 'bg-secondary';
+
             if(statusText === 'pending_head') { statusText = 'รอหัวหน้าตรวจสอบ'; badgeClass = 'bg-warning text-dark'; }
             else if(statusText === 'pending_manager') { statusText = 'รอผู้บริหารอนุมัติ'; badgeClass = 'bg-info text-dark'; }
             else if(statusText === 'processed') { statusText = 'อนุมัติเรียบร้อย'; badgeClass = 'bg-success'; }
             else if(statusText === 'rejected') { statusText = 'ไม่อนุมัติ/ตีกลับ'; badgeClass = 'bg-danger'; }
+
             const row = `<tr><td class="ps-4"><span class="fw-bold text-primary">${docNo}</span></td><td>${date}</td><td><div class="small">${from}</div></td><td><span class="badge ${badgeClass}">${statusText}</span></td><td class="text-center pe-4"><button onclick="openDetailModal('${doc.id}')" class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-sm">ตรวจสอบ</button></td></tr>`;
             tableBody.innerHTML += row;
         });
@@ -289,7 +315,9 @@ async function updateBadges() {
             q = q.eq('status', 'pending_head');
             if(table === 'purchase_requests') q = q.eq('department', currentUserDept);
             else q = q.eq('from_dept', currentUserDept);
-        } else { q = q.eq('status', 'pending_manager'); }
+        } else {
+            q = q.eq('status', 'pending_manager');
+        }
         const { count } = await q;
         return count || 0;
     };
@@ -327,7 +355,7 @@ window.openDetailModal = function(id) {
         }
 
         itemsToShow.forEach((item, index) => {
-            // [FIXED] ใช้ index ที่แท้จริงในการสร้าง ID
+            // [FIXED] ใช้ ID ที่แน่นอนในการระบุ Checkbox
             let realIndex = currentDoc.items.indexOf(item); 
             let actionHtml = '';
             let reasonHtml = '';
@@ -397,7 +425,7 @@ window.toggleReason = function(index) {
     }
 }
 
-// [FIXED] Logic บันทึก: ป้องกันการเขียนทับรายการที่หัวหน้าไม่อนุมัติ
+// [Logic บันทึกฉบับปรับปรุง: ป้องกันทับสถานะ + รองรับ Retry]
 window.finalizeApproval = async function() {
     const btn = document.querySelector('.btn-success');
     btn.disabled = true; btn.innerText = '⏳ กำลังบันทึก...';
@@ -413,18 +441,14 @@ window.finalizeApproval = async function() {
         if (currentDocType === 'pr') {
             let hasRejectionWithoutReason = false;
             
-            // วนลูปสร้างรายการใหม่ โดยไม่เขียนทับของเดิมถ้าหา input ไม่เจอ
+            // ใช้ map เพื่อสร้าง array ใหม่ที่อัปเดตแล้ว
             const updatedItems = currentDoc.items.map((item, index) => {
                 const checkbox = document.getElementById(`check-${index}`);
                 const reasonInput = document.getElementById(`reason-${index}`);
                 
-                // กรณี: Manager (checkbox จะเป็น null สำหรับรายการที่หัวหน้าไม่อนุมัติ เพราะถูก filter ออก)
-                // ดังนั้นถ้าหา checkbox ไม่เจอ ให้คืนค่า item เดิมกลับไปเลย (ห้ามแก้!)
-                if (!checkbox) {
-                    return item; 
-                }
+                // กรณี Manager: รายการที่ Head ปัดตกจะไม่มี Checkbox (เพราะซ่อนไว้) -> ให้คืนค่าเดิมกลับไป (ห้ามแก้!)
+                if (!checkbox) return item;
 
-                // กรณี: มี checkbox (รายการที่แสดงผลอยู่)
                 const isApproved = checkbox.checked;
                 const reason = reasonInput ? reasonInput.value : '';
                 
@@ -432,20 +456,12 @@ window.finalizeApproval = async function() {
 
                 const roleName = currentUserRole === 'head' ? 'หัวหน้าแผนก' : 'ผู้บริหาร';
                 
-                // ถ้าไม่อนุมัติ -> แก้สถานะ + ใส่เหตุผล
+                // ถ้าไม่อนุมัติ -> เปลี่ยนเป็น rejected
                 if (!isApproved) {
-                    return {
-                        ...item,
-                        status: 'rejected',
-                        remark: `${reason} (โดย: ${roleName})`
-                    };
+                    return { ...item, status: 'rejected', remark: `${reason} (โดย: ${roleName})` };
                 } else {
-                    // ถ้าอนุมัติ -> แก้สถานะ + ล้างเหตุผล
-                    return {
-                        ...item,
-                        status: 'approved',
-                        remark: ''
-                    };
+                    // ถ้าอนุมัติ -> เปลี่ยนเป็น approved
+                    return { ...item, status: 'approved', remark: '' };
                 }
             });
 
@@ -455,7 +471,6 @@ window.finalizeApproval = async function() {
                 return;
             }
             
-            // อัปเดต items กลับไปที่ตัวแปรหลัก
             currentDoc.items = updatedItems;
         }
 
@@ -481,11 +496,10 @@ window.finalizeApproval = async function() {
 
         if (currentDocType === 'pr') updatePayload.items = currentDoc.items;
 
-        // บันทึกลง DB
+        // บันทึกลง DB (พร้อม Retry กรณีไม่มี Column เวลา)
         let { error } = await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
 
         if (error) {
-            // ถ้า Error 400 แสดงว่าไม่มี Column เวลา -> ลองบันทึกแบบไม่ใส่เวลา
             if (error.code === 'PGRST204' || error.code === '42703' || (error.message && error.message.includes('400'))) {
                 console.warn("Database missing timestamp columns. Retrying without timestamp...");
                 delete updatePayload.head_approved_at;
@@ -497,7 +511,7 @@ window.finalizeApproval = async function() {
 
         if (error) throw error;
 
-        // ส่งเมล (ใส่ try-catch กันพัง)
+        // ส่งเมล (Safe Mode)
         try {
             if (emailTo && isEmailEnabled) {
                 btn.innerText = '⏳ กำลังส่งเมล...';
@@ -532,6 +546,38 @@ window.rejectDocument = async function() {
         bootstrap.Modal.getInstance(document.getElementById('detailModal')).hide();
         loadData();
     } catch(err) { console.error(err); alert('Error: ' + err.message); } finally { if(btn) { btn.disabled = false; btn.innerText = 'ตีกลับเอกสาร'; } }
+}
+
+// ================= ฟังก์ชัน Export Log =================
+window.exportToCSV = async function() {
+    const btn = document.querySelector('button[onclick="exportToCSV()"]');
+    const originalText = btn.innerHTML;
+    btn.disabled = true; btn.innerHTML = '⏳ กำลังดึง...';
+    try {
+        const tableName = currentDocType === 'pr' ? 'purchase_requests' : 'memos';
+        const { data, error } = await db.from(tableName).select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        if (!data.length) { alert("ไม่มีข้อมูล"); return; }
+
+        let csvContent = "\uFEFF"; 
+        if (currentDocType === 'pr') {
+            csvContent += "วันที่ขอ,เลขที่ PR,ผู้ขอซื้อ,แผนก,สถานะ,หัวหน้าอนุมัติ,ผู้บริหารอนุมัติ\n";
+            data.forEach(row => {
+                csvContent += `${new Date(row.created_at).toLocaleDateString()},"${row.pr_number}","${row.requester}","${row.department}","${row.status}","${row.head_approved_at||'-'}","${row.manager_approved_at||'-'}"\n`;
+            });
+        } else {
+            csvContent += "วันที่,เลขที่ Memo,จาก,ถึง,เรื่อง,สถานะ\n";
+            data.forEach(row => {
+                csvContent += `${new Date(row.date).toLocaleDateString()},"${row.memo_no}","${row.from_dept}","${row.to_dept}","${row.subject}","${row.status}"\n`;
+            });
+        }
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `Log_${currentDocType}_${Date.now()}.csv`);
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    } catch(e) { alert(e.message); } finally { btn.disabled = false; btn.innerHTML = originalText; }
 }
 
 // ================= 7. VIEW / PRINT LOADERS (Auto Pagination) =================
