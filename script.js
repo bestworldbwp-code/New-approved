@@ -64,7 +64,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 
-// ================= 3. MEMO FORM (แก้ไข: ให้พิมพ์ PDF หลังส่ง) =================
+// ================= 3. MEMO FORM =================
 const memoForm = document.getElementById('memoForm');
 if (memoForm) {
     memoForm.addEventListener('submit', async (e) => {
@@ -97,12 +97,11 @@ if (memoForm) {
                 status: 'pending_head'
             };
 
-            // [จุดแก้] ใช้ .select() เพื่อเอา ID ที่เพิ่งสร้างกลับมา
             const { data, error } = await db.from('memos').insert([payload]).select();
             if (error) throw error;
-            const newId = data[0].id; // ได้ ID เอกสารใหม่
+            const newId = data[0].id;
 
-            // ส่งเมลหาผู้อนุมัติ (ยังคงไว้ เพื่อให้ process เดิน)
+            // ส่งเมลหาผู้อนุมัติ
             const headEmail = CONFIG.departmentHeads[payload.from_dept];
             const adminLink = window.location.origin + '/admin.html';
             if (headEmail) {
@@ -113,7 +112,6 @@ if (memoForm) {
                 });
             }
             
-            // [จุดแก้] ถามผู้ใช้ว่าจะพิมพ์เลยไหม
             if(confirm('✅ บันทึก Memo เรียบร้อย!\nคุณต้องการเปิดหน้าสำหรับ "พิมพ์/บันทึก PDF" เลยหรือไม่?')) {
                 window.open(`view_memo.html?id=${newId}`, '_blank');
             }
@@ -123,7 +121,7 @@ if (memoForm) {
     });
 }
 
-// ================= 4. PR FORM (แก้ไข: ให้พิมพ์ PDF หลังส่ง) =================
+// ================= 4. PR FORM =================
 window.addItemRow = function() {
     const container = document.getElementById('itemsContainer');
     if (!container) return; 
@@ -194,12 +192,11 @@ if (prForm) {
                 status: 'pending_head' 
             };
             
-            // [จุดแก้] ใช้ .select() เพื่อเอา ID
             const { data, error } = await db.from('purchase_requests').insert([payload]).select();
             if (error) throw error;
             const newId = data[0].id;
 
-            // ส่งเมลหาผู้อนุมัติ (คงไว้)
+            // ส่งเมลหาผู้อนุมัติ
             const adminLink = window.location.origin + '/admin.html';
             await emailjs.send(CONFIG.emailServiceId, CONFIG.emailTemplateId_Master, { 
                 to_email: headEmail, 
@@ -207,7 +204,6 @@ if (prForm) {
                 html_content: `<h3>เรียน ผู้อนุมัติเบื้องต้น (${dept})</h3><p>มีรายการขอซื้อใหม่จาก <b>${payload.requester}</b> รอการตรวจสอบ</p><p>เลขที่ PR: ${payload.pr_number}</p><p><a href="${adminLink}">คลิกเพื่อเข้าสู่ระบบอนุมัติ</a></p>` 
             });
 
-            // [จุดแก้] ถามผู้ใช้ว่าจะพิมพ์เลยไหม
             if(confirm('✅ ส่งคำขอ PR เรียบร้อย!\nคุณต้องการเปิดหน้าสำหรับ "พิมพ์/บันทึก PDF" เพื่อเก็บเป็นหลักฐานเลยหรือไม่?')) {
                 window.open(`view_pr.html?id=${newId}&mode=original`, '_blank');
             }
@@ -421,7 +417,7 @@ window.toggleReason = function(index) {
     }
 }
 
-// [Logic ปุ่มเขียว: บันทึก (รวมเวลา) + ตัดเมลแจ้งกลับ Requester]
+// [Logic ปุ่มเขียว]
 window.finalizeApproval = async function() {
     const btn = document.querySelector('.btn-success');
     btn.disabled = true; btn.innerText = '⏳ กำลังประมวลผล...';
@@ -490,9 +486,6 @@ window.finalizeApproval = async function() {
                 <p>1. <a href="${linkApproved}" style="font-weight:bold; color:green;">📂 รายการที่อนุมัติ (PO)</a></p>
                 <p>2. <a href="${linkOriginal}" style="font-weight:bold; color:gray;">📄 ต้นฉบับทั้งหมด (Log)</a></p>
             `;
-
-            // [จุดแก้] ตัดการส่งเมลกลับหา Requester เพื่อประหยัดโควตา
-            // if (currentDoc.email) { ... }  <-- ลบออก
         }
 
         if (currentDocType === 'pr') updatePayload.items = currentDoc.items;
@@ -500,7 +493,6 @@ window.finalizeApproval = async function() {
         const { error } = await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
         if (error) throw error;
 
-        // ยังส่งเมลหา Manager/Purchasing ตามปกติ เพื่อให้งานเดิน
         if (emailTo) {
             await emailjs.send(CONFIG.emailServiceId, CONFIG.emailTemplateId_Master, { 
                 to_email: emailTo, subject: emailSubject, html_content: emailContent 
@@ -529,16 +521,13 @@ window.rejectDocument = async function() {
         }
         await db.from(tableName).update(updatePayload).eq('id', currentDoc.id);
         
-        // [จุดแก้] ตัดการส่งเมลแจ้งตีกลับ (ผู้ขอต้องมาเช็คเอง)
-        // if (currentDoc.email) { ... } <-- ลบออก
-
         alert('❌ ตีกลับเอกสารเรียบร้อย');
         bootstrap.Modal.getInstance(document.getElementById('detailModal')).hide();
         loadData();
     } catch(err) { console.error(err); alert('Error: ' + err.message); } finally { if(btn) { btn.disabled = false; btn.innerText = 'ตีกลับเอกสาร'; } }
 }
 
-// ================= 7. VIEW / PRINT LOADERS =================
+// ================= 7. VIEW / PRINT LOADERS (AUTO PAGINATION) =================
 const formatDate = (isoStr) => {
     if(!isoStr) return "";
     const d = new Date(isoStr);
@@ -554,44 +543,86 @@ async function loadPRForPrint() {
         const { data: pr, error } = await db.from('purchase_requests').select('*').eq('id', id).single();
         if (error) throw error;
 
-        document.getElementById('v_pr_number').innerText = pr.pr_number;
-        document.getElementById('v_created_at').innerText = new Date(pr.created_at).toLocaleDateString('th-TH');
-        document.getElementById('v_requester').innerText = pr.requester;
-        document.getElementById('v_department').innerText = pr.department;
-        document.getElementById('v_required_date').innerText = new Date(pr.required_date).toLocaleDateString('th-TH');
-        document.getElementById('v_remark').innerText = pr.header_remark || '-';
-
-        if (mode === 'approved') document.getElementById('doc_title').innerHTML += ' <span class="text-success" style="font-size:16px;">(รายการที่อนุมัติ)</span>';
-        else if (mode === 'original') document.getElementById('doc_title').innerHTML += ' <span class="text-secondary" style="font-size:16px;">(ต้นฉบับทั้งหมด)</span>';
-
-        const tbody = document.getElementById('v_tableBody'); tbody.innerHTML = '';
         let displayItems = pr.items;
         if (mode === 'approved') displayItems = pr.items.filter(item => item.status === 'approved');
 
-        displayItems.forEach((item, index) => {
-            let statusBadge = '';
-            let rowStyle = '';
-            if (item.status === 'approved') {
-                statusBadge = '<span class="fw-bold text-success">✅ อนุมัติ</span>';
-            } else if (item.status === 'rejected') {
-                statusBadge = `<span class="text-danger fw-bold">❌ ไม่อนุมัติ</span><br><span class="text-danger small d-block mt-1">${item.remark}</span>`;
-                if(mode === 'original') rowStyle = 'background-color: #fff5f5;'; 
-            } else {
-                statusBadge = '<span class="text-warning">รอพิจารณา</span>';
+        // ==== PAGINATION LOGIC ====
+        const ITEMS_PER_PAGE = 12; // จำนวนสินค้าต่อหน้า (ปรับได้)
+        const totalItems = displayItems.length;
+        const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
+        const container = document.getElementById('pages-container');
+        const template = document.getElementById('page-template').innerHTML;
+
+        container.innerHTML = ''; // Clear container
+
+        for (let i = 0; i < totalPages; i++) {
+            // สร้างหน้าใหม่จาก Template
+            const pageDiv = document.createElement('div');
+            pageDiv.innerHTML = template;
+            
+            // ดึง Element ในหน้านั้นๆ มาแก้ไข
+            const page = pageDiv.querySelector('.page');
+            const tbody = pageDiv.querySelector('.v_tableBody');
+            
+            // ใส่ข้อมูล Header
+            pageDiv.querySelector('.v_pr_number').innerText = pr.pr_number;
+            pageDiv.querySelector('.v_created_at').innerText = new Date(pr.created_at).toLocaleDateString('th-TH');
+            pageDiv.querySelector('.v_requester').innerText = pr.requester;
+            pageDiv.querySelector('.v_department').innerText = pr.department;
+            pageDiv.querySelector('.v_required_date').innerText = new Date(pr.required_date).toLocaleDateString('th-TH');
+            pageDiv.querySelector('.page-number-slot').innerText = `หน้า ${i + 1}/${totalPages}`;
+
+            if (mode === 'approved') pageDiv.querySelector('.doc-title').innerHTML += ' <span class="text-success" style="font-size:16px;">(รายการที่อนุมัติ)</span>';
+            else if (mode === 'original') pageDiv.querySelector('.doc-title').innerHTML += ' <span class="text-secondary" style="font-size:16px;">(ต้นฉบับทั้งหมด)</span>';
+
+            // ใส่รายการสินค้า (เฉพาะส่วนของหน้านี้)
+            const start = i * ITEMS_PER_PAGE;
+            const end = start + ITEMS_PER_PAGE;
+            const pageItems = displayItems.slice(start, end);
+
+            pageItems.forEach((item, index) => {
+                let globalIndex = start + index + 1;
+                let statusBadge = '';
+                let rowStyle = '';
+                if (item.status === 'approved') {
+                    statusBadge = '<span class="fw-bold text-success">✅ อนุมัติ</span>';
+                } else if (item.status === 'rejected') {
+                    statusBadge = `<span class="text-danger fw-bold">❌ ไม่อนุมัติ</span><br><span class="text-danger small d-block mt-1">${item.remark}</span>`;
+                    if(mode === 'original') rowStyle = 'background-color: #fff5f5;'; 
+                } else {
+                    statusBadge = '<span class="text-warning">รอพิจารณา</span>';
+                }
+                tbody.innerHTML += `<tr style="${rowStyle}"><td class="text-center">${globalIndex}</td><td>${item.code || '-'}</td><td>${item.description}</td><td class="text-center">${item.quantity}</td><td class="text-center">${item.unit}</td><td class="text-center">${statusBadge}</td></tr>`;
+            });
+
+            // เติมบรรทัดว่างให้เต็มตาราง (เพื่อความสวยงาม)
+            const emptyRows = ITEMS_PER_PAGE - pageItems.length;
+            for(let k=0; k<emptyRows; k++) {
+                tbody.innerHTML += `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>`;
             }
-            tbody.innerHTML += `<tr style="${rowStyle}"><td class="text-center">${index + 1}</td><td>${item.code || '-'}</td><td>${item.description}</td><td class="text-center">${item.quantity}</td><td class="text-center">${item.unit}</td><td class="text-center">${statusBadge}</td></tr>`;
-        });
 
-        document.getElementById('v_sign_requester').innerText = pr.requester;
-        document.getElementById('v_sign_date_req').innerText = "วันที่ " + new Date(pr.created_at).toLocaleDateString('th-TH');
+            // จัดการ Footer (ลายเซ็น)
+            const footer = pageDiv.querySelector('.footer-section');
+            if (i < totalPages - 1) {
+                // ถ้าไม่ใช่หน้าสุดท้าย ให้ซ่อนส่วนลายเซ็น
+                footer.style.display = 'none'; 
+            } else {
+                // หน้าสุดท้าย -> ใส่ข้อมูลลายเซ็น
+                pageDiv.querySelector('.v_remark').innerText = pr.header_remark || '-';
+                pageDiv.querySelector('.v_sign_requester').innerText = pr.requester;
+                pageDiv.querySelector('.v_sign_date_req').innerText = "วันที่ " + new Date(pr.created_at).toLocaleDateString('th-TH');
 
-        if (pr.status !== 'pending_head' && pr.status !== 'pending') {
-            let headTime = pr.head_approved_at ? `<br><span class="text-dark small">วันที่ ${formatDate(pr.head_approved_at)}</span>` : '';
-            document.getElementById('v_sign_head').innerHTML = `( ผู้อนุมัติเบื้องต้น ${pr.department} )<br><span class="text-success small">อนุมัติออนไลน์</span>${headTime}`; 
-        }
-        if (pr.status === 'processed') { 
-            let managerTime = pr.manager_approved_at ? `<br><span class="text-dark small">วันที่ ${formatDate(pr.manager_approved_at)}</span>` : '';
-            document.getElementById('v_sign_manager').innerHTML = `( เบญจมาศ ถิ่นจันทร์ )<br><span class="text-success small">อนุมัติออนไลน์</span>${managerTime}`; 
+                if (pr.status !== 'pending_head' && pr.status !== 'pending') {
+                    let headTime = pr.head_approved_at ? `<br><span class="text-dark small">วันที่ ${formatDate(pr.head_approved_at)}</span>` : '';
+                    pageDiv.querySelector('.v_sign_head').innerHTML = `( ผู้อนุมัติเบื้องต้น ${pr.department} )<br><span class="text-success small">อนุมัติออนไลน์</span>${headTime}`; 
+                }
+                if (pr.status === 'processed') { 
+                    let managerTime = pr.manager_approved_at ? `<br><span class="text-dark small">วันที่ ${formatDate(pr.manager_approved_at)}</span>` : '';
+                    pageDiv.querySelector('.v_sign_manager').innerHTML = `( เบญจมาศ ถิ่นจันทร์ )<br><span class="text-success small">อนุมัติออนไลน์</span>${managerTime}`; 
+                }
+            }
+
+            container.appendChild(pageDiv);
         }
 
     } catch (err) { alert('Error: ' + err.message); }
@@ -617,5 +648,5 @@ async function loadMemoForPrint() {
     } catch (err) { alert('Error: ' + err.message); }
 }
 
-if(document.getElementById('v_tableBody')) window.onload = loadPRForPrint;
+if(document.getElementById('pages-container')) window.onload = loadPRForPrint;
 if(document.getElementById('v_content')) window.onload = loadMemoForPrint;
