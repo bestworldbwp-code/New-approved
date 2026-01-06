@@ -10,14 +10,12 @@
     <style>
         body { background-color: #f8f9fa; font-family: 'Sarabun', sans-serif; } 
         .main-container { max-width: 900px; background: white; padding: 40px; margin: 30px auto; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        /* สไตล์สำหรับหน้าจอสำเร็จ */
         #successSection { display: none; text-align: center; padding: 20px; }
         .success-icon { font-size: 80px; color: #198754; margin-bottom: 20px; }
     </style>
 </head>
 <body>
 <div class="main-container">
-    
     <div id="formSection">
         <a href="index.html" class="btn btn-outline-secondary btn-sm mb-3">⬅️ กลับหน้าเมนูหลัก</a>
         <div class="text-center mb-5">
@@ -32,18 +30,24 @@
                     <label class="form-label fw-bold">หน่วยงาน</label>
                     <select id="department" class="form-select" required>
                         <option value="" selected disabled>-- กรุณาเลือก --</option>
+                        <option value="คลังสินค้า">คลังสินค้า</option>
+                        <option value="ทรัพยากรบุคคล">ทรัพยากรบุคคล</option>
+                        <option value="การตลาด">การตลาด</option>
+                        <option value="ขาย">ขาย</option>
                         <option value="จัดซื้อ">จัดซื้อ</option>
                         <option value="QC">QC</option>
+                        <option value="วางแผน">วางแผน</option>
+                        <option value="R&D">R&D</option>
                         <option value="ซ่อมบำรุง">ซ่อมบำรุง</option>
                         <option value="ฝ่ายผลิต">ฝ่ายผลิต</option>
-                        <option value="HR">HR</option>
+                        <option value="Safety">Safety</option>
                     </select>
                 </div>
                 
                 <div class="col-md-6"><label class="form-label fw-bold">เลขที่ PR</label><input type="text" id="pr_number" class="form-control" required></div>
                 <div class="col-md-6"><label class="form-label fw-bold">ผู้ขอซื้อ</label><input type="text" id="requester" class="form-control" required></div>
                 <div class="col-md-6"><label class="form-label fw-bold">อีเมลผู้ขอ</label><input type="email" id="email" class="form-control" required></div>
-                <div class="col-md-6"><label class="form-label fw-bold">วันที่ต้องการของ</label><input type="date" id="required_date" class="form-control" required></div>
+                <div class="col-md-6"><label class="form-label fw-bold">วันที่ต้องการสินค้า</label><input type="date" id="required_date" class="form-control" required></div>
             </div>
 
             <hr class="my-4">
@@ -59,20 +63,13 @@
     <div id="successSection">
         <div class="success-icon">✅</div>
         <h2 class="fw-bold text-success">บันทึกข้อมูลเรียบร้อย!</h2>
-        <p class="text-muted mb-4">เอกสารถูกส่งไปยังผู้อนุมัติแล้ว ท่านสามารถสั่งพิมพ์เอกสารได้จากปุ่มด้านล่าง</p>
-        
+        <p class="text-muted mb-4">เอกสารถูกส่งไปยังผู้จัดการแผนกแล้ว ท่านสามารถสั่งพิมพ์เอกสารได้จากปุ่มด้านล่าง</p>
         <div class="d-grid gap-3 col-md-8 mx-auto">
-            <button id="btnPrintPDF" class="btn btn-primary btn-lg shadow-sm">
-                🖨️ เปิดไฟล์ PDF / สั่งพิมพ์
-            </button>
-            <a href="index.html" class="btn btn-outline-secondary">
-                🏠 กลับหน้าเมนูหลัก
-            </a>
+            <button id="btnPrintPDF" class="btn btn-primary btn-lg shadow-sm">🖨️ เปิดไฟล์ PDF / สั่งพิมพ์</button>
+            <a href="index.html" class="btn btn-outline-secondary">🏠 กลับหน้าเมนูหลัก</a>
         </div>
     </div>
-
 </div>
-
 <script src="logo.js"></script><script src="script.js"></script>
 </body>
 </html>
