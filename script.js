@@ -117,7 +117,7 @@ if (memoForm) {
     });
 }
 
-// ================= 4. PR FORM =================
+// ================= 4. PR FORM (แก้ไข: เปลี่ยนเป็นหน้าจอ Success) =================
 window.addItemRow = function() {
     const container = document.getElementById('itemsContainer');
     if (!container) return; 
@@ -197,10 +197,16 @@ if (prForm) {
                     });
                 }
             } catch (emailErr) { console.error("Email sending failed but data saved:", emailErr); }
-            if(confirm('✅ ส่งคำขอ PR เรียบร้อย!\n\nกด "ตกลง" เพื่อเปิดหน้าพิมพ์เอกสารต้นฉบับเก็บไว้\nกด "ยกเลิก" เพื่อกลับหน้าเมนูหลัก')) {
+            
+            // [FIXED] เปลี่ยนเป็นแสดงหน้าจอ Success แทน confirm box
+            document.getElementById('formSection').style.display = 'none';
+            document.getElementById('successSection').style.display = 'block';
+            
+            // ผูกฟังก์ชันปุ่มปริ้น
+            document.getElementById('btnPrintPDF').onclick = function() {
                 window.open(`view_pr.html?id=${newId}&mode=original`, '_blank');
-            }
-            window.location.href = 'index.html'; 
+            };
+
         } catch (err) { console.error(err); alert('Error: ' + err.message); btn.disabled = false; btn.innerText = originalText; }
     });
 }
