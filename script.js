@@ -9,26 +9,38 @@ const CONFIG = {
     emailServiceId: 'service_tolm3pu',   
     emailTemplateId_Master: 'template_master', 
 
-    // [1] อีเมลผู้อนุมัติเบื้องต้น (เปลี่ยนเป็น: ผู้จัดการแผนก)
+    // [1] อีเมลผู้อนุมัติเบื้องต้น (ผู้จัดการแผนก)
     departmentHeads: {
+        'คลังสินค้า':        'jakkidmarat@gmail.com',
+        'ทรัพยากรบุคคล':     'jakkidmarat@gmail.com',
+        'การตลาด':           'jakkidmarat@gmail.com',
+        'ขาย':               'jakkidmarat@gmail.com',
         'จัดซื้อ':           'jakkidmarat@gmail.com',
         'QC':                'jakkidmarat@gmail.com',
+        'วางแผน':            'jakkidmarat@gmail.com',
+        'R&D':               'jakkidmarat@gmail.com',
         'ซ่อมบำรุง':         'jakkidmarat@gmail.com',
         'ฝ่ายผลิต':          'jakkidmarat@gmail.com',
-        'HR':                'jakkidmarat@gmail.com'
+        'Safety':            'jakkidmarat@gmail.com'
     },
 
     // [2] ผู้บริหารระดับสูง (อนุมัติขั้นสุดท้าย) & ฝ่ายจัดซื้อ
     managerEmail: 'bestworld.bwp328@gmail.com', 
     purchasingEmail: 'hr.bpp.2564@gmail.com',
 
-    // รหัสผ่านเข้าสู่ระบบ (Admin)
+    // [3] รหัสผ่านเข้าสู่ระบบ (สำหรับแต่ละแผนก)
     passwords: {
         '1001': 'จัดซื้อ', 
         '1002': 'QC', 
         '1003': 'ซ่อมบำรุง', 
         '1004': 'ฝ่ายผลิต', 
-        '1005': 'HR',
+        '1005': 'ทรัพยากรบุคคล',
+        '1006': 'คลังสินค้า',
+        '1007': 'การตลาด',
+        '1008': 'ขาย',
+        '1009': 'วางแผน',
+        '1010': 'R&D',
+        '1011': 'Safety',
         '9999': 'MANAGER_ROLE' 
     }
 };
@@ -98,6 +110,7 @@ if (memoForm) {
             const { data, error } = await db.from('memos').insert([payload]).select();
             if (error) throw error;
             const newId = data[0].id;
+            
             try {
                 const headEmail = CONFIG.departmentHeads[payload.from_dept];
                 const adminLink = window.location.origin + '/admin.html';
@@ -109,15 +122,17 @@ if (memoForm) {
                     });
                 }
             } catch(e) { console.warn('Email failed', e); }
-            if(confirm('✅ บันทึกสำเร็จ!\nต้องการเปิดหน้าพิมพ์ PDF เลยหรือไม่?')) {
+
+            if(confirm('✅ บันทึก Memo เรียบร้อย!\n\nกด "ตกลง" เพื่อเปิดหน้าพิมพ์เอกสารเก็บไว้\nกด "ยกเลิก" เพื่อกลับหน้าหลัก')) {
                 window.open(`view_memo.html?id=${newId}`, '_blank');
             }
-            window.location.href = 'index.html';
+            window.location.href = 'index.html'; 
+
         } catch (err) { console.error(err); alert('Error: ' + err.message); btn.disabled = false; btn.innerText = originalText; }
     });
 }
 
-// ================= 4. PR FORM (แก้ไข: เปลี่ยนเป็นหน้าจอ Success) =================
+// ================= 4. PR FORM =================
 window.addItemRow = function() {
     const container = document.getElementById('itemsContainer');
     if (!container) return; 
@@ -198,11 +213,10 @@ if (prForm) {
                 }
             } catch (emailErr) { console.error("Email sending failed but data saved:", emailErr); }
             
-            // [FIXED] เปลี่ยนเป็นแสดงหน้าจอ Success แทน confirm box
+            // เปลี่ยนเป็นหน้าจอ Success
             document.getElementById('formSection').style.display = 'none';
             document.getElementById('successSection').style.display = 'block';
             
-            // ผูกฟังก์ชันปุ่มปริ้น
             document.getElementById('btnPrintPDF').onclick = function() {
                 window.open(`view_pr.html?id=${newId}&mode=original`, '_blank');
             };
@@ -331,13 +345,12 @@ window.openDetailModal = function(id) {
             let realIndex = currentDoc.items.indexOf(item); 
             let actionHtml = '';
             let reasonHtml = '';
-            let qtyHtml = item.quantity; // ค่าเริ่มต้นเป็นข้อความ
+            let qtyHtml = item.quantity; 
 
             if (currentMode === 'history') {
                 actionHtml = item.status === 'approved' ? '<span class="text-success">✅ อนุมัติ</span>' : '<span class="text-danger">❌ ไม่อนุมัติ</span>';
                 reasonHtml = item.remark || '-';
             } else {
-                // ถ้าเป็นผู้จัดการแผนก (head) ให้แก้จำนวนได้
                 if (currentUserRole === 'head') {
                     qtyHtml = `<input type="number" class="form-control form-control-sm text-center fw-bold" id="qty-${realIndex}" value="${item.quantity}" style="width:80px; margin:0 auto;">`;
                 }
@@ -423,14 +436,13 @@ window.finalizeApproval = async function() {
             const updatedItems = currentDoc.items.map((item, index) => {
                 const checkbox = document.getElementById(`check-${index}`);
                 const reasonInput = document.getElementById(`reason-${index}`);
-                const qtyInput = document.getElementById(`qty-${index}`); // ดึงค่าจำนวนที่แก้
+                const qtyInput = document.getElementById(`qty-${index}`); 
                 
                 if (!checkbox) return item;
 
                 const isApproved = checkbox.checked;
                 const reason = reasonInput ? reasonInput.value : '';
                 
-                // ตรวจสอบจำนวนใหม่ (ถ้ามีการแก้)
                 let newQty = item.quantity;
                 if (qtyInput && currentUserRole === 'head') {
                     newQty = qtyInput.value;
@@ -473,7 +485,7 @@ window.finalizeApproval = async function() {
             emailSubject = `[Approved] คำสั่งซื้อ PR ${currentDoc.pr_number} อนุมัติแล้ว`;
             const linkApproved = window.location.origin + `/view_pr.html?id=${currentDoc.id}&mode=approved`;
             const linkOriginal = window.location.origin + `/view_pr.html?id=${currentDoc.id}&mode=original`;
-            emailContent = `<h3>เรียน ฝ่ายจัดซื้อ</h3><p>PR เลขที่ <b>${currentDoc.pr_number}</b> อนุมัติเรียบร้อยแล้ว</p><hr><p>1. <a href="${linkApproved}">📂 ไฟล์ PO</a></p><p>2. <a href="${linkOriginal}">📄 ไฟล์ Log ต้นฉบับ</a></p>`;
+            emailContent = `<h3>เรียน ฝ่ายจัดซื้อ</h3><p>PR เลขที่ <b>${currentDoc.pr_number}</b> อนุมัติเรียบร้อยแล้ว</p><hr><p>1. <a href="${linkApproved}">📂 ไฟล์ PR</a></p><p>2. <a href="${linkOriginal}">📄 ไฟล์ Log ต้นฉบับ</a></p>`;
         }
 
         if (currentDocType === 'pr') updatePayload.items = currentDoc.items;
