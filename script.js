@@ -9,7 +9,7 @@ const CONFIG = {
     emailServiceId: 'service_tolm3pu',   
     emailTemplateId_Master: 'template_master', 
 
-    // [1] อีเมลผู้อนุมัติเบื้องต้น (ผู้จัดการแผนก) - เพิ่มแผนก "ขนส่ง"
+    // [1] อีเมลผู้อนุมัติเบื้องต้น (ผู้จัดการแผนก) - ครบ 12 แผนก
     departmentHeads: {
         'คลังสินค้า':        'jakkidmarat@gmail.com',
         'ทรัพยากรบุคคล':     'jakkidmarat@gmail.com',
@@ -22,14 +22,14 @@ const CONFIG = {
         'ซ่อมบำรุง':         'jakkidmarat@gmail.com',
         'ฝ่ายผลิต':          'jakkidmarat@gmail.com',
         'Safety':            'jakkidmarat@gmail.com',
-        'ขนส่ง':             'jakkidmarat@gmail.com'  // <-- เพิ่มใหม่
+        'ขนส่ง':             'jakkidmarat@gmail.com'
     },
 
     // [2] ผู้บริหารระดับสูง (อนุมัติขั้นสุดท้าย) & ฝ่ายจัดซื้อ
     managerEmail: 'bestworld.bwp328@gmail.com', 
     purchasingEmail: 'hr.bpp.2564@gmail.com',
 
-    // [3] รหัสผ่านเข้าสู่ระบบ (Admin) - เพิ่มรหัส 1012 สำหรับขนส่ง
+    // [3] รหัสผ่านเข้าสู่ระบบ (Admin) - ครบ 12 แผนก
     passwords: {
         '1001': 'จัดซื้อ', 
         '1002': 'QC', 
@@ -42,7 +42,7 @@ const CONFIG = {
         '1009': 'วางแผน',
         '1010': 'R&D',
         '1011': 'Safety',
-        '1012': 'ขนส่ง', // <-- เพิ่มใหม่
+        '1012': 'ขนส่ง',
         '9999': 'MANAGER_ROLE' 
     }
 };
@@ -594,7 +594,7 @@ async function loadPRForPrint() {
         let displayItems = pr.items;
         if (mode === 'approved') displayItems = pr.items.filter(item => item.status === 'approved');
 
-        const ITEMS_PER_PAGE = 15; 
+        const ITEMS_PER_PAGE = 10; 
         const totalItems = displayItems.length;
         const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
         const container = document.getElementById('pages-container');
