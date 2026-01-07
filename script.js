@@ -9,7 +9,7 @@ const CONFIG = {
     emailServiceId: 'service_tolm3pu',   
     emailTemplateId_Master: 'template_master', 
 
-    // [1] อีเมลผู้อนุมัติเบื้องต้น (ผู้จัดการแผนก)
+    // [1] อีเมลผู้อนุมัติเบื้องต้น (ผู้จัดการแผนก) - เพิ่มแผนก "ขนส่ง"
     departmentHeads: {
         'คลังสินค้า':        'jakkidmarat@gmail.com',
         'ทรัพยากรบุคคล':     'jakkidmarat@gmail.com',
@@ -21,14 +21,15 @@ const CONFIG = {
         'R&D':               'jakkidmarat@gmail.com',
         'ซ่อมบำรุง':         'jakkidmarat@gmail.com',
         'ฝ่ายผลิต':          'jakkidmarat@gmail.com',
-        'Safety':            'jakkidmarat@gmail.com'
+        'Safety':            'jakkidmarat@gmail.com',
+        'ขนส่ง':             'jakkidmarat@gmail.com'  // <-- เพิ่มใหม่
     },
 
     // [2] ผู้บริหารระดับสูง (อนุมัติขั้นสุดท้าย) & ฝ่ายจัดซื้อ
     managerEmail: 'bestworld.bwp328@gmail.com', 
     purchasingEmail: 'hr.bpp.2564@gmail.com',
 
-    // [3] รหัสผ่านเข้าสู่ระบบ (สำหรับแต่ละแผนก)
+    // [3] รหัสผ่านเข้าสู่ระบบ (Admin) - เพิ่มรหัส 1012 สำหรับขนส่ง
     passwords: {
         '1001': 'จัดซื้อ', 
         '1002': 'QC', 
@@ -41,6 +42,7 @@ const CONFIG = {
         '1009': 'วางแผน',
         '1010': 'R&D',
         '1011': 'Safety',
+        '1012': 'ขนส่ง', // <-- เพิ่มใหม่
         '9999': 'MANAGER_ROLE' 
     }
 };
@@ -351,6 +353,7 @@ window.openDetailModal = function(id) {
                 actionHtml = item.status === 'approved' ? '<span class="text-success">✅ อนุมัติ</span>' : '<span class="text-danger">❌ ไม่อนุมัติ</span>';
                 reasonHtml = item.remark || '-';
             } else {
+                // ถ้าเป็นผู้จัดการแผนก (head) ให้แก้จำนวนได้
                 if (currentUserRole === 'head') {
                     qtyHtml = `<input type="number" class="form-control form-control-sm text-center fw-bold" id="qty-${realIndex}" value="${item.quantity}" style="width:80px; margin:0 auto;">`;
                 }
@@ -417,7 +420,7 @@ window.toggleReason = function(index) {
     }
 }
 
-// [FIXED] Logic บันทึก: รองรับการแก้จำนวน + ป้องกันการเขียนทับ
+// [Logic บันทึก]
 window.finalizeApproval = async function() {
     const btn = document.querySelector('.btn-success');
     btn.disabled = true; btn.innerText = '⏳ กำลังบันทึก...';
