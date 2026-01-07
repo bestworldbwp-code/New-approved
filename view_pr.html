@@ -8,31 +8,122 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { background: #525659; font-family: 'Sarabun', sans-serif; color: #000; margin: 0; } 
+        
         #pages-container { display: flex; flex-direction: column; align-items: center; padding: 20px 0; }
-        .page { background: white; width: 210mm; height: 297mm; padding: 15mm 20mm; margin-bottom: 10mm; position: relative; display: flex; flex-direction: column; box-shadow: 0 0 10px rgba(0,0,0,0.3); box-sizing: border-box; page-break-after: always; }
+        
+        /* ตั้งค่าหน้ากระดาษ A4 แบบล็อคความสูง */
+        .page { 
+            background: white; 
+            width: 210mm; 
+            height: 296mm; /* ลดลงนิดนึงกัน Browser แถมขอบ */
+            padding: 10mm 15mm; /* ขอบกระดาษ */
+            margin-bottom: 10mm; 
+            position: relative; 
+            display: flex; 
+            flex-direction: column; 
+            box-shadow: 0 0 10px rgba(0,0,0,0.3); 
+            box-sizing: border-box; 
+            page-break-after: always;
+            overflow: hidden; /* ห้ามมีอะไรล้นออกมา */
+        }
+
         #page-template { display: none; }
+
         .table-bordered, .table-bordered th, .table-bordered td { border: 1px solid #000 !important; }
         .sign-line { border-bottom: 1px dotted #000; width: 140px; margin: 5px auto; height: 5px; } 
-        @media print { body { background: white; } #pages-container { padding: 0; display: block; } .page { margin: 0; box-shadow: none; border: none; height: 297mm; width: 100%; page-break-after: always; } .page:last-child { page-break-after: auto; } .no-print { display: none !important; } } 
+        
+        /* ดัน Footer ไปล่างสุดเสมอ */
+        .footer-section { margin-top: auto; }
+
+        /* ตาราง */
+        .table-container { flex-grow: 1; }
+        .table td { vertical-align: middle; padding: 4px 5px; } /* ลด padding ตารางให้กระชับ */
+
+        @media print { 
+            body { background: white; } 
+            #pages-container { padding: 0; display: block; } 
+            .page { margin: 0; box-shadow: none; border: none; height: 296mm; width: 100%; page-break-after: always; } 
+            .page:last-child { page-break-after: auto; } 
+            .no-print { display: none !important; } 
+        } 
     </style>
 </head>
 <body>
+
 <div class="text-center mt-3 mb-3 no-print" style="position: fixed; top: 0; left: 0; width: 100%; z-index: 1000; pointer-events: none;">
     <div style="pointer-events: auto; display: inline-block; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 10px;">
         <button onclick="window.print()" class="btn btn-primary shadow">🖨️ สั่งพิมพ์ / บันทึก PDF</button>
         <button onclick="window.close()" class="btn btn-secondary ms-2">ปิดหน้าต่าง</button>
     </div>
 </div>
+
 <div id="pages-container"></div>
+
 <div id="page-template">
     <div class="page">
-        <div class="text-center mb-2 border-bottom border-dark pb-2" style="height: 100px;">
-            <div class="d-flex align-items-center justify-content-center"><img src="" class="app-logo me-3" alt="Logo" style="height: 50px;"><div class="text-start"><h4 class="fw-bold m-0" style="font-size: 18px;">บริษัท เบสท์เวิลด์ อินเตอร์พลาส จำกัด</h4><small style="font-size: 12px;">328 ม.6 ต.คลองนิยมยาตรา อ.บางบ่อ จ.สมุทรปราการ 10560</small></div></div>
-            <h5 class="mt-2 fw-bold doc-title">ใบขอซื้อ (Purchase Request)</h5><div class="text-end small page-number-slot" style="margin-top: -20px;">หน้า 1/1</div>
+        <div class="text-center mb-1 border-bottom border-dark pb-1" style="height: 90px;">
+            <div class="d-flex align-items-center justify-content-center">
+                <img src="" class="app-logo me-3" alt="Logo" style="height: 50px;">
+                <div class="text-start">
+                    <h4 class="fw-bold m-0" style="font-size: 18px;">บริษัท เบสท์เวิลด์ อินเตอร์พลาส จำกัด</h4>
+                    <small style="font-size: 12px;">328 ม.6 ต.คลองนิยมยาตรา อ.บางบ่อ จ.สมุทรปราการ 10560</small>
+                </div>
+            </div>
+            <h5 class="mt-2 fw-bold doc-title">ใบขอซื้อ (Purchase Request)</h5>
+            <div class="text-end small page-number-slot" style="margin-top: -20px;">หน้า 1/1</div>
         </div>
-        <div class="row border border-dark p-2 mb-2 mx-0 rounded small" style="height: 90px;"><div class="col-6 mb-1"><strong>เลขที่เอกสาร:</strong> <span class="v_pr_number">-</span></div><div class="col-6 mb-1"><strong>วันที่ขอ:</strong> <span class="v_created_at">-</span></div><div class="col-6 mb-1"><strong>ผู้ขอซื้อ:</strong> <span class="v_requester">-</span></div><div class="col-6 mb-1"><strong>แผนก:</strong> <span class="v_department">-</span></div><div class="col-6"><strong>วันที่ต้องการสินค้า:</strong> <span class="v_required_date text-danger">-</span></div></div>
-        <div style="flex-grow: 1;"><table class="table table-bordered table-sm align-middle small"><thead class="table-light text-center fw-bold"><tr><th width="5%">#</th><th width="15%">รหัส</th><th>รายการสินค้า</th><th width="10%">จำนวน</th><th width="10%">หน่วย</th><th width="20%">สถานะ</th></tr></thead><tbody class="v_tableBody"></tbody></table></div>
-        <div class="footer-section mt-auto"><div class="mt-1 mb-3 small"><strong>หมายเหตุ:</strong> <span class="v_remark">-</span></div><div class="row text-center pt-2 signature-area"><div class="col-4"><div class="fw-bold mb-1">ผู้ขอซื้อ</div><div class="mb-1 fw-bold text-primary v_sign_requester" style="height: 20px;"></div><div class="sign-line"></div><small class="v_sign_date_req">วันที่ ...../...../.....</small></div><div class="col-4"><div class="fw-bold mb-1">ผู้จัดการแผนก</div><div class="mb-1 v_sign_head" style="height: 40px; line-height: 1.2;">( ........................... )</div><div class="sign-line"></div></div><div class="col-4"><div class="fw-bold mb-1">ผู้บริหารระดับสูง</div><div class="mb-1 v_sign_manager" style="height: 40px; line-height: 1.2;">( ........................... )</div><div class="sign-line"></div></div></div><div class="text-end mt-2 small text-muted" style="font-size: 10px;">FQP-PUR-01:04 Rev.02</div></div>
+
+        <div class="row border border-dark p-2 mb-2 mx-0 rounded small" style="height: 90px;">
+            <div class="col-6 mb-1"><strong>เลขที่เอกสาร:</strong> <span class="v_pr_number">-</span></div>
+            <div class="col-6 mb-1"><strong>วันที่ขอ:</strong> <span class="v_created_at">-</span></div>
+            <div class="col-6 mb-1"><strong>ผู้ขอซื้อ:</strong> <span class="v_requester">-</span></div>
+            <div class="col-6 mb-1"><strong>แผนก:</strong> <span class="v_department">-</span></div>
+            <div class="col-6"><strong>วันที่ต้องการสินค้า:</strong> <span class="v_required_date text-danger">-</span></div>
+        </div>
+
+        <div class="table-container">
+            <table class="table table-bordered table-sm align-middle small" style="font-size: 14px;">
+                <thead class="table-light text-center fw-bold">
+                    <tr>
+                        <th width="5%">#</th>
+                        <th width="15%">รหัส</th>
+                        <th>รายการสินค้า</th>
+                        <th width="10%">จำนวน</th>
+                        <th width="10%">หน่วย</th>
+                        <th width="20%">สถานะ</th>
+                    </tr>
+                </thead>
+                <tbody class="v_tableBody"></tbody>
+            </table>
+        </div>
+
+        <div class="footer-section">
+            <div class="mt-1 mb-2 small" style="height: 40px; overflow: hidden;"><strong>หมายเหตุ:</strong> <span class="v_remark">-</span></div>
+
+            <div class="row text-center pt-2 signature-area">
+                <div class="col-4">
+                    <div class="fw-bold mb-1">ผู้ขอซื้อ</div>
+                    <div class="mb-1 fw-bold text-primary v_sign_requester" style="height: 20px;"></div>
+                    <div class="sign-line"></div>
+                    <small class="v_sign_date_req">วันที่ ...../...../.....</small>
+                </div>
+                <div class="col-4">
+                    <div class="fw-bold mb-1">ผู้จัดการแผนก</div>
+                    <div class="mb-1 v_sign_head" style="height: 40px; line-height: 1.2; font-size: 12px;">( ........................... )</div>
+                    <div class="sign-line"></div>
+                </div>
+                <div class="col-4">
+                    <div class="fw-bold mb-1">ผู้บริหารระดับสูง</div>
+                    <div class="mb-1 v_sign_manager" style="height: 40px; line-height: 1.2; font-size: 12px;">( ........................... )</div>
+                    <div class="sign-line"></div>
+                </div>
+            </div>
+            <div class="text-end mt-2 small text-muted" style="font-size: 10px;">FQP-PUR-01:04 Rev.02</div>
+        </div>
     </div>
 </div>
-<script src="logo.js"></script><script src="script.js"></script></body></html>
+
+<script src="logo.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
